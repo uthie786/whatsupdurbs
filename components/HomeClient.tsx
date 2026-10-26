@@ -163,8 +163,9 @@ export default function HomeClient() {
 
       <footer className="border-t-4 border-black bg-black text-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-8">
-          <p className="font-display text-xl">
-            WhatsUp<span className="text-durbs-pink">Durbs</span> 🌊
+          <p className="flex items-center gap-1.5 font-display text-xl">
+            <span>WhatsUp<span className="text-durbs-pink">Durbs</span></span>
+            <img src="/logo.svg" alt="" aria-hidden className="h-7 w-auto" />
           </p>
           <p className="text-sm font-semibold text-neutral-300">
             Made with sunshine &amp; sea salt in Durban. *Roughly.
