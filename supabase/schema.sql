@@ -75,3 +75,24 @@ select cron.schedule(
   '0 * * * *',
   $$delete from public.events where denied_at is not null and denied_at < now() - interval '24 hours'$$
 );
+
+-- Quicket sync cursor (service role only: RLS on, no policies).
+create table if not exists public.sync_state (
+  key          text primary key,
+  last_success timestamptz,
+  last_error   text,
+  updated_at   timestamptz not null default now()
+);
+alter table public.sync_state enable row level security;
+
+-- Hourly Quicket sync. Quicket's list API can only return ~2h of changes
+-- before timing out, so it must run often. Replace the URL and secret.
+create extension if not exists pg_net;
+select cron.schedule(
+  'quicket-sync',
+  '7 * * * *',
+  $$select net.http_get(
+      url := 'https://YOUR-SITE.vercel.app/api/sync/quicket',
+      headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'),
+      timeout_milliseconds := 60000)$$
+);

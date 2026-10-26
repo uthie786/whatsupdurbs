@@ -31,12 +31,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
 ## Quicket sync
 
-Upcoming public Quicket events within ~45 km of Durban are imported into `events` (published, with "Get Tickets" linking to the Quicket page).
+Public Quicket events within ~45 km of Durban are imported into `events` (published, with "Get Tickets" linking to the Quicket page).
 
+**How it works:** Quicket's "list events" API times out on its own server for anything bigger than about two hours of changes, and the API key has a low request quota. So the sync is *incremental*: every hour it asks for events modified since the last successful run (with a 10-minute overlap) and stores the cursor in `sync_state`. If it falls more than 2 hours behind, it skips ahead and notes the gap. A full historical import isn't possible through Quicket's API, so events that already existed before the first sync appear once their organiser edits them. Use **Import from Quicket link** on `/admin` for those (one API request per event).
+
+Setup:
 - Set these **server-only** env vars in Vercel (no `NEXT_PUBLIC_` prefix): `QUICKET_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`.
-- Run the migration block in `supabase/schema.sql` (adds `source` and `external_id`, and tightens the public insert policy).
-- A Vercel Cron job (`vercel.json`) runs `/api/sync/quicket?mode=recent` daily at 05:00 SAST, picking up events changed in the last 3 days.
-- On `/admin`, **Sync Quicket** runs a full import (it resumes page by page until done).
+- Run the migration blocks in `supabase/schema.sql`: the `source`/`external_id` columns, the `sync_state` table, and the hourly `quicket-sync` pg_cron job (fill in your site URL and `CRON_SECRET`; needs the `pg_cron` and `pg_net` extensions).
+- A daily Vercel Cron (`vercel.json`) calls the same endpoint as a backup.
+- `GET /api/sync/quicket?dryRun=1` (with `Authorization: Bearer $CRON_SECRET`) fetches and maps without saving.
 - Re-syncs update an event's details but never override your approve / feature / unpublish choices.
 - Events are matched to the nearest of the six areas for filtering; their map pins use the real venue location.
 
