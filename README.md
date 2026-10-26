@@ -48,7 +48,11 @@ Past events are hidden from the public site automatically (nothing is deleted).
 |-----------|--------------|
 | `/`       | Hero, featured carousel, interactive Durban map, filters (category / date / area / search) and event grid |
 | `/submit` | Organiser submission form → inserted with `is_approved: false` |
-| `/admin`  | Moderation queue: 1-click approve, feature/unfeature, unpublish |
+| `/admin`  | Moderation queue: 1-click approve, deny, feature/unfeature, unpublish; Quicket sync |
+
+### Denying submissions
+
+**Deny** on a pending submission moves it to the *Denied* tab, where it can be restored. Denied rows are deleted 24 hours later by the `purge-denied-events` pg_cron job in `supabase/schema.sql` (and, as a backup, by each Quicket sync).
 
 ## Project layout
 

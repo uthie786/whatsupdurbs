@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import type { DurbsEvent } from "@/types/event";
 import { CATEGORY_COLORS } from "@/lib/areas";
 import { EVENT_CATEGORIES } from "@/types/event";
+import type { DateRange } from "@/lib/filters";
+import DateRangePicker from "./DateRangePicker";
 
 const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
   ssr: false,
@@ -14,7 +16,13 @@ const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
   ),
 });
 
-export default function MapSection({ events }: { events: DurbsEvent[] }) {
+interface MapSectionProps {
+  events: DurbsEvent[];
+  dateRange?: DateRange;
+  onDateRangeChange?: (range: DateRange) => void;
+}
+
+export default function MapSection({ events, dateRange, onDateRangeChange }: MapSectionProps) {
   return (
     <section id="map" className="mx-auto max-w-7xl px-4 py-10">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -36,6 +44,14 @@ export default function MapSection({ events }: { events: DurbsEvent[] }) {
           ))}
         </ul>
       </div>
+      {dateRange && onDateRangeChange && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-3 border-black bg-durbs-yellow px-3 py-2 shadow-brutal">
+          <DateRangePicker value={dateRange} onChange={onDateRangeChange} />
+          <span className="brutal-badge bg-white">
+            {events.length} event{events.length === 1 ? "" : "s"} on the map
+          </span>
+        </div>
+      )}
       <div className="relative z-0 h-[420px] overflow-hidden border-4 border-black shadow-brutal-lg sm:h-[520px]">
         <InteractiveMap events={events} />
       </div>

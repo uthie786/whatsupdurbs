@@ -281,8 +281,18 @@ export async function fetchApprovedEvents(): Promise<DurbsEvent[]> {
   return (data ?? []) as DurbsEvent[];
 }
 
+/** Denied submissions are deleted this long after being denied. */
+export const DENIED_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 export async function fetchAllEventsForAdmin(): Promise<DurbsEvent[]> {
-  if (!supabase) return [...getMockStore()].sort(byStartDate);
+  if (!supabase) {
+    // Demo mode stands in for the database purge job.
+    const cutoff = Date.now() - DENIED_RETENTION_MS;
+    mockStore = getMockStore().filter(
+      (e) => !e.denied_at || new Date(e.denied_at).getTime() > cutoff,
+    );
+    return [...mockStore].sort(byStartDate);
+  }
   const { data, error } = await supabase
     .from(EVENTS_TABLE)
     .select("*")
@@ -305,9 +315,13 @@ export async function submitEvent(input: NewEventInput): Promise<void> {
   if (error) throw error;
 }
 
+export type EventFlagsPatch = Partial<
+  Pick<DurbsEvent, "is_approved" | "is_featured" | "denied_at">
+>;
+
 export async function updateEventFlags(
   id: string,
-  patch: Partial<Pick<DurbsEvent, "is_approved" | "is_featured">>,
+  patch: EventFlagsPatch,
 ): Promise<void> {
   if (!supabase) {
     const event = getMockStore().find((e) => e.id === id);

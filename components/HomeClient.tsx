@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowDown, Plus, Waves } from "lucide-react";
 import type { AreaFilter, CategoryFilter, DateFilter, DurbsEvent } from "@/types/event";
 import { fetchApprovedEvents, isSupabaseConfigured } from "@/lib/supabase";
-import { filterEvents } from "@/lib/filters";
+import { EMPTY_RANGE, filterEvents, type DateRange } from "@/lib/filters";
 import Navbar from "./Navbar";
 import FeaturedCarousel from "./FeaturedCarousel";
 import MapSection from "./MapSection";
@@ -32,6 +32,18 @@ export default function HomeClient() {
   const [area, setArea] = useState<AreaFilter>("All Areas");
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [date, setDate] = useState<DateFilter>("All");
+  const [range, setRange] = useState<DateRange>(EMPTY_RANGE);
+
+  // Quick "When" chips and the custom range are mutually exclusive.
+  const changeDate = (value: DateFilter) => {
+    setDate(value);
+    if (value !== "All") setRange(EMPTY_RANGE);
+  };
+  const changeRange = (value: DateRange) => {
+    const swapped = value.from && value.to && value.from > value.to;
+    setRange(swapped ? { from: value.to, to: value.from } : value);
+    if (value.from || value.to) setDate("All");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -47,8 +59,8 @@ export default function HomeClient() {
   }, []);
 
   const filtered = useMemo(
-    () => filterEvents(events, { search, area, category, date }),
-    [events, search, area, category, date],
+    () => filterEvents(events, { search, area, category, date, range }),
+    [events, search, area, category, date, range],
   );
   const featured = useMemo(() => events.filter((e) => e.is_featured), [events]);
 
@@ -57,6 +69,7 @@ export default function HomeClient() {
     setArea("All Areas");
     setCategory("All");
     setDate("All");
+    setRange(EMPTY_RANGE);
   };
 
   return (
@@ -110,11 +123,20 @@ export default function HomeClient() {
             </div>
           </div>
           <div className="overflow-hidden border-t-4 border-black bg-black py-2 text-durbs-yellow">
-            <div className="animate-marquee flex w-max gap-8 whitespace-nowrap font-display text-lg uppercase">
-              {[...MARQUEE, ...MARQUEE].map((w, i) => (
-                <span key={i}>
-                  {w} <span className="text-durbs-pink">✱</span>
-                </span>
+            {/* Two identical groups, each at least viewport-wide, so -50% loops seamlessly. */}
+            <div className="animate-marquee flex w-max whitespace-nowrap font-display text-lg uppercase">
+              {[0, 1].map((copy) => (
+                <div
+                  key={copy}
+                  aria-hidden={copy === 1}
+                  className="flex min-w-[100vw] shrink-0 items-center justify-around gap-8 pr-8"
+                >
+                  {MARQUEE.map((w) => (
+                    <span key={w}>
+                      {w} <span className="text-durbs-pink">✱</span>
+                    </span>
+                  ))}
+                </div>
               ))}
             </div>
           </div>
@@ -137,7 +159,7 @@ export default function HomeClient() {
 
         <FeaturedCarousel events={featured} />
 
-        <MapSection events={filtered} />
+        <MapSection events={filtered} dateRange={range} onDateRangeChange={changeRange} />
 
         <section id="events" className="mx-auto max-w-7xl scroll-mt-28 space-y-6 px-4 py-10">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -153,7 +175,9 @@ export default function HomeClient() {
             date={date}
             area={area}
             onCategoryChange={setCategory}
-            onDateChange={setDate}
+            onDateChange={changeDate}
+            dateRange={range}
+            onDateRangeChange={changeRange}
             onAreaChange={setArea}
             onReset={resetFilters}
           />

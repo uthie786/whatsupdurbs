@@ -1,20 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Check, CloudDownload, Loader2, LogOut, RefreshCw, Star, Undo2 } from "lucide-react";
+import { Ban, Check, CloudDownload, Loader2, LogOut, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
 import type { DurbsEvent } from "@/types/event";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
 import {
+  DENIED_RETENTION_MS,
   fetchAllEventsForAdmin,
   isSupabaseConfigured,
   supabase,
   updateEventFlags,
+  type EventFlagsPatch,
 } from "@/lib/supabase";
 
-type Tab = "pending" | "approved";
+function hoursUntilPurge(deniedAt: string): number {
+  const ms = new Date(deniedAt).getTime() + DENIED_RETENTION_MS - Date.now();
+  return Math.max(0, Math.ceil(ms / 3_600_000));
+}
+
+type Tab = "pending" | "approved" | "denied";
 
 interface SyncResponse {
   processed: number;
@@ -22,6 +29,7 @@ interface SyncResponse {
   updated: number;
   failed: number;
   nextPage: number | null;
+  pageSize?: number;
   pages?: number;
   error?: string;
 }
@@ -116,9 +124,11 @@ export default function AdminPage() {
       const token = data.session?.access_token;
       if (!token) throw new Error("Your session expired, please sign in again.");
       let page: number | null = 1;
+      let pageSize: number | undefined;
       while (page) {
         setSyncStatus(`Syncing Quicket… page ${page} · ${totals.inserted} new, ${totals.updated} updated`);
-        const res: Response = await fetch(`/api/sync/quicket?mode=full&startPage=${page}`, {
+        const qs = `mode=full&startPage=${page}${pageSize ? `&pageSize=${pageSize}` : ""}`;
+        const res: Response = await fetch(`/api/sync/quicket?${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const body = (await res.json().catch(() => ({}))) as Partial<SyncResponse>;
@@ -128,6 +138,7 @@ export default function AdminPage() {
         totals.failed += body.failed ?? 0;
         if (!res.ok) throw new Error(body.error || `Sync failed (${res.status})`);
         page = body.nextPage ?? null;
+        pageSize = body.pageSize ?? pageSize;
       }
       setSyncStatus(
         `Quicket sync done: checked ${totals.processed} events · ${totals.inserted} new · ${totals.updated} updated` +
@@ -142,7 +153,7 @@ export default function AdminPage() {
     }
   }
 
-  async function patch(id: string, flags: Partial<Pick<DurbsEvent, "is_approved" | "is_featured">>) {
+  async function patch(id: string, flags: EventFlagsPatch) {
     const previous = events;
     setBusyId(id);
     setEvents((list) => list.map((e) => (e.id === id ? { ...e, ...flags } : e)));
@@ -156,9 +167,10 @@ export default function AdminPage() {
     }
   }
 
-  const pending = events.filter((e) => !e.is_approved);
+  const pending = events.filter((e) => !e.is_approved && !e.denied_at);
   const approved = events.filter((e) => e.is_approved);
-  const visible = tab === "pending" ? pending : approved;
+  const denied = events.filter((e) => !e.is_approved && e.denied_at);
+  const visible = tab === "pending" ? pending : tab === "approved" ? approved : denied;
 
   return (
     <>
@@ -219,11 +231,12 @@ export default function AdminPage() {
 
         {authed && (
           <>
-            <div className="flex gap-3" role="tablist">
+            <div className="flex flex-wrap gap-3" role="tablist">
               {(
                 [
                   ["pending", `Pending (${pending.length})`, "bg-durbs-pink text-white"],
                   ["approved", `Live (${approved.length})`, "bg-durbs-cyan"],
+                  ["denied", `Denied (${denied.length})`, "bg-black text-white"],
                 ] as const
               ).map(([key, label, active]) => (
                 <button
@@ -247,7 +260,11 @@ export default function AdminPage() {
               <p className="font-bold">Loading…</p>
             ) : visible.length === 0 ? (
               <p className="border-4 border-dashed border-black p-8 text-center font-display text-xl uppercase">
-                {tab === "pending" ? "Queue's empty. Go to the beach. 🏖️" : "Nothing live yet."}
+                {tab === "pending"
+                  ? "Queue's empty. Go to the beach. 🏖️"
+                  : tab === "approved"
+                    ? "Nothing live yet."
+                    : "No denied submissions."}
               </p>
             ) : (
               <ul className="space-y-4">
@@ -270,6 +287,11 @@ export default function AdminPage() {
                         <span className="brutal-badge bg-white">{event.area}</span>
                         {event.source === "quicket" && (
                           <span className="brutal-badge bg-black text-white">Quicket</span>
+                        )}
+                        {event.denied_at && !event.is_approved && (
+                          <span className="brutal-badge bg-red-500 text-white">
+                            Denied · deletes in ~{hoursUntilPurge(event.denied_at)}h
+                          </span>
                         )}
                         {event.is_featured && (
                           <span className="brutal-badge bg-durbs-yellow">
@@ -294,42 +316,71 @@ export default function AdminPage() {
                         </a>
                       )}
                     </div>
-                    <div className="flex flex-row gap-2 sm:flex-col">
-                      {event.is_approved ? (
+                    <div className="flex flex-row flex-wrap gap-2 sm:flex-col">
+                      {event.denied_at && !event.is_approved ? (
                         <button
                           type="button"
                           disabled={busyId === event.id}
-                          onClick={() => patch(event.id, { is_approved: false, is_featured: false })}
+                          onClick={() => patch(event.id, { denied_at: null })}
                           className="brutal-btn bg-white !text-xs"
                         >
-                          <Undo2 className="h-4 w-4" /> Unpublish
+                          <RotateCcw className="h-4 w-4" /> Restore
                         </button>
                       ) : (
-                        <button
-                          type="button"
-                          disabled={busyId === event.id}
-                          onClick={() => patch(event.id, { is_approved: true })}
-                          className="brutal-btn bg-green-400 !text-xs"
-                        >
-                          <Check className="h-4 w-4" strokeWidth={3} /> Approve
-                        </button>
+                        <>
+                          {event.is_approved ? (
+                            <button
+                              type="button"
+                              disabled={busyId === event.id}
+                              onClick={() => patch(event.id, { is_approved: false, is_featured: false })}
+                              className="brutal-btn bg-white !text-xs"
+                            >
+                              <Undo2 className="h-4 w-4" /> Unpublish
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busyId === event.id}
+                                onClick={() => patch(event.id, { is_approved: true, denied_at: null })}
+                                className="brutal-btn bg-green-400 !text-xs"
+                              >
+                                <Check className="h-4 w-4" strokeWidth={3} /> Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyId === event.id}
+                                onClick={() =>
+                                  patch(event.id, {
+                                    denied_at: new Date().toISOString(),
+                                    is_approved: false,
+                                    is_featured: false,
+                                  })
+                                }
+                                className="brutal-btn bg-red-500 !text-xs text-white"
+                              >
+                                <Ban className="h-4 w-4" strokeWidth={3} /> Deny
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            disabled={busyId === event.id}
+                            onClick={() =>
+                              patch(event.id, {
+                                is_featured: !event.is_featured,
+                                // Featuring an event also publishes it.
+                                ...(!event.is_featured ? { is_approved: true, denied_at: null } : {}),
+                              })
+                            }
+                            className={`brutal-btn !text-xs ${
+                              event.is_featured ? "bg-black text-durbs-yellow" : "bg-durbs-yellow"
+                            }`}
+                          >
+                            <Star className="h-4 w-4" /> {event.is_featured ? "Unfeature" : "Feature"}
+                          </button>
+                        </>
                       )}
-                      <button
-                        type="button"
-                        disabled={busyId === event.id}
-                        onClick={() =>
-                          patch(event.id, {
-                            is_featured: !event.is_featured,
-                            // Featuring an event also publishes it.
-                            ...(!event.is_featured ? { is_approved: true } : {}),
-                          })
-                        }
-                        className={`brutal-btn !text-xs ${
-                          event.is_featured ? "bg-black text-durbs-yellow" : "bg-durbs-yellow"
-                        }`}
-                      >
-                        <Star className="h-4 w-4" /> {event.is_featured ? "Unfeature" : "Feature"}
-                      </button>
                     </div>
                   </li>
                 ))}
