@@ -71,11 +71,30 @@ export function dateMatches(
   }
 }
 
+/** Inclusive calendar-day range as yyyy-MM-dd strings; null means open-ended. */
+export interface DateRange {
+  from: string | null;
+  to: string | null;
+}
+
+export const EMPTY_RANGE: DateRange = { from: null, to: null };
+
+export function isRangeActive(range: DateRange | undefined): boolean {
+  return Boolean(range && (range.from || range.to));
+}
+
+export function rangeMatches(range: DateRange, event: DurbsEvent): boolean {
+  const from = range.from ? startOfDay(parseISO(range.from)) : new Date(-8.64e15);
+  const to = range.to ? endOfDay(parseISO(range.to)) : new Date(8.64e15);
+  return overlaps(event, from, to);
+}
+
 export interface EventFilters {
   search: string;
   category: CategoryFilter;
   date: DateFilter;
   area: AreaFilter;
+  range?: DateRange;
 }
 
 export function filterEvents(events: DurbsEvent[], f: EventFilters): DurbsEvent[] {
@@ -84,6 +103,7 @@ export function filterEvents(events: DurbsEvent[], f: EventFilters): DurbsEvent[
     if (f.category !== "All" && e.category !== f.category) return false;
     if (!areaMatches(f.area, e.area)) return false;
     if (!dateMatches(f.date, e)) return false;
+    if (f.range && isRangeActive(f.range) && !rangeMatches(f.range, e)) return false;
     if (q) {
       const haystack = `${e.title} ${e.venue_name} ${e.area} ${e.description} ${e.category}`.toLowerCase();
       if (!haystack.includes(q)) return false;

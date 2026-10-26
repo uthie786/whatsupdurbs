@@ -1,15 +1,37 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { subDays } from "date-fns";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { fetchQuicketPage, mapQuicketEvent, type QuicketEventRow, type SkipReason } from "@/lib/quicket";
-import { EVENTS_TABLE } from "@/lib/supabase";
+import {
+  QUICKET_PAGE_SIZES,
+  fetchQuicketPageWithFallback,
+  mapQuicketEvent,
+  type QuicketEventRow,
+  type SkipReason,
+} from "@/lib/quicket";
+import { DENIED_RETENTION_MS, EVENTS_TABLE } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Stop starting new pages after this long so we finish inside maxDuration. */
 const TIME_BUDGET_MS = 45_000;
-const PAGE_SIZE = 100;
+
+/** Backup for the Supabase pg_cron job: drop denials older than 24h. */
+async function purgeDenied(): Promise<number> {
+  const cutoff = new Date(Date.now() - DENIED_RETENTION_MS).toISOString();
+  const { data, error } = await getSupabaseAdmin()
+    .from(EVENTS_TABLE)
+    .delete()
+    .not("denied_at", "is", null)
+    .lt("denied_at", cutoff)
+    .select("id");
+  if (error) {
+    // Column may not exist yet if the migration hasn't been run.
+    console.error("Purging denied events failed:", error.message);
+    return 0;
+  }
+  return data?.length ?? 0;
+}
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
   const header = req.headers.get("authorization") ?? "";
@@ -79,6 +101,11 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const mode = params.get("mode") === "recent" ? "recent" : "full";
   const startPage = Math.max(1, parseInt(params.get("startPage") ?? "1", 10) || 1);
+  const requestedSize = parseInt(params.get("pageSize") ?? "", 10);
+  let pageSize = (QUICKET_PAGE_SIZES as readonly number[]).includes(requestedSize)
+    ? requestedSize
+    : QUICKET_PAGE_SIZES[0];
+  const dryRun = params.get("dryRun") === "1";
   const lastModified = mode === "recent" ? subDays(new Date(), 3) : undefined;
 
   const started = Date.now();
@@ -91,10 +118,17 @@ export async function GET(req: NextRequest) {
   };
   let page = startPage;
   let pages = startPage;
+  let purged = 0;
+  const sample: QuicketEventRow[] = [];
 
   try {
+    if (startPage === 1 && !dryRun) purged = await purgeDenied();
+
     while (page <= pages && Date.now() - started < TIME_BUDGET_MS) {
-      const result = await fetchQuicketPage(page, { pageSize: PAGE_SIZE, lastModified });
+      const fetched = await fetchQuicketPageWithFallback(page, pageSize, lastModified);
+      const result = fetched.result;
+      page = fetched.page;
+      pageSize = fetched.pageSize;
       pages = result.pages || 0;
       const rows: QuicketEventRow[] = [];
       for (const event of result.results ?? []) {
@@ -103,7 +137,10 @@ export async function GET(req: NextRequest) {
         if ("row" in mapped) rows.push(mapped.row);
         else skipped[mapped.skip]++;
       }
-      if (rows.length) {
+      if (dryRun) {
+        sample.push(...rows.slice(0, Math.max(0, 5 - sample.length)));
+        totals.inserted += rows.length;
+      } else if (rows.length) {
         const saved = await saveRows(rows);
         totals.inserted += saved.inserted;
         totals.updated += saved.updated;
@@ -115,17 +152,21 @@ export async function GET(req: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Quicket sync failed:", message);
     return NextResponse.json(
-      { error: message, ...totals, skipped, nextPage: page },
+      { error: message, ...totals, skipped, nextPage: page, pageSize },
       { status: 502 },
     );
   }
 
   return NextResponse.json({
     mode,
+    dryRun,
     ...totals,
     skipped,
+    purged,
     pages,
+    pageSize,
     nextPage: page <= pages ? page : null,
+    ...(dryRun ? { sample } : {}),
     ms: Date.now() - started,
   });
 }

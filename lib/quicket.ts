@@ -68,9 +68,47 @@ export async function fetchQuicketPage(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Quicket API ${res.status}: ${body.slice(0, 200)}`);
+    throw new QuicketApiError(res.status, page, opts.pageSize ?? 100, body.slice(0, 200));
   }
   return (await res.json()) as QuicketListResult;
+}
+
+export class QuicketApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly page: number,
+    readonly pageSize: number,
+    body: string,
+  ) {
+    super(`Quicket API ${status} on page ${page} (pageSize ${pageSize}): ${body}`);
+  }
+}
+
+/** Each size divides the previous one, so page numbers convert exactly. */
+export const QUICKET_PAGE_SIZES = [100, 50, 10] as const;
+
+/**
+ * Fetch a page, retrying with smaller page sizes when Quicket returns a 5xx.
+ * Returns the page number and size that actually worked.
+ */
+export async function fetchQuicketPageWithFallback(
+  page: number,
+  pageSize: number,
+  lastModified?: Date,
+): Promise<{ result: QuicketListResult; page: number; pageSize: number }> {
+  let size = pageSize;
+  let p = page;
+  for (;;) {
+    try {
+      const result = await fetchQuicketPage(p, { pageSize: size, lastModified });
+      return { result, page: p, pageSize: size };
+    } catch (err) {
+      const smaller = QUICKET_PAGE_SIZES.find((s) => s < size);
+      if (!(err instanceof QuicketApiError) || err.status < 500 || !smaller) throw err;
+      p = Math.floor(((p - 1) * size) / smaller) + 1;
+      size = smaller;
+    }
+  }
 }
 
 /* ------------------------------ Mapping ------------------------------ */

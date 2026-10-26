@@ -22,6 +22,7 @@ create table if not exists public.events (
   is_approved  boolean not null default false,
   source       text not null default 'manual',
   external_id  text unique,
+  denied_at    timestamptz,
   created_at   timestamptz not null default now()
 );
 
@@ -29,6 +30,9 @@ create table if not exists public.events (
 alter table public.events
   add column if not exists source text not null default 'manual',
   add column if not exists external_id text unique;
+
+-- Migration for admin "Deny": denied rows are purged 24h later.
+alter table public.events add column if not exists denied_at timestamptz;
 
 create index if not exists events_approved_start_idx on public.events (is_approved, start_date);
 
@@ -45,7 +49,8 @@ drop policy if exists "Public submit pending events" on public.events;
 create policy "Public submit pending events"
   on public.events for insert
   with check (is_approved = false and is_featured = false
-              and source = 'manual' and external_id is null);
+              and source = 'manual' and external_id is null
+              and denied_at is null);
 
 -- Signed-in moderators can read everything and approve/feature events.
 -- Tighten this further (e.g. a moderators table or a custom claim) for production.
@@ -61,3 +66,12 @@ create policy "Moderators update"
   to authenticated
   using (true)
   with check (true);
+
+-- Hourly purge of submissions denied more than 24 hours ago.
+-- (The Quicket sync also purges them as a backup.)
+create extension if not exists pg_cron;
+select cron.schedule(
+  'purge-denied-events',
+  '0 * * * *',
+  $$delete from public.events where denied_at is not null and denied_at < now() - interval '24 hours'$$
+);
