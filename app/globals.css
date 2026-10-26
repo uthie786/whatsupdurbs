@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-black antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .brutal-card {
+    @apply border-3 border-black bg-white shadow-brutal;
+  }
+
+  .brutal-btn {
+    @apply inline-flex items-center justify-center gap-2 border-3 border-black px-4 py-2 font-display text-sm font-black uppercase tracking-wide shadow-brutal transition-all duration-100;
+    @apply hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-brutal-lg;
+    @apply active:translate-x-1 active:translate-y-1 active:shadow-none;
+    @apply disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal;
+  }
+
+  .brutal-input {
+    @apply w-full border-3 border-black bg-white px-3 py-2 font-semibold shadow-brutal outline-none transition-shadow placeholder:text-neutral-500 focus:bg-durbs-yellow/20 focus:shadow-brutal-lg;
+  }
+
+  .brutal-badge {
+    @apply inline-flex items-center gap-1 border-2 border-black px-2 py-0.5 text-[11px] font-black uppercase tracking-wider;
+  }
+
+  .brutal-chip {
+    @apply border-3 border-black px-3 py-1.5 text-xs font-black uppercase tracking-wide transition-all duration-100;
+  }
+  .brutal-chip[aria-pressed="true"] {
+    @apply bg-black text-durbs-yellow shadow-[3px_3px_0px_0px_#FF2E93];
+  }
+  .brutal-chip[aria-pressed="false"] {
+    @apply bg-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:bg-durbs-cyan;
+  }
+}
+
+/* Leaflet popup restyle */
+.durbs-popup .leaflet-popup-content-wrapper {
+  border: 3px solid #000;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 0 #000;
+  padding: 0;
+}
+.durbs-popup .leaflet-popup-content {
+  margin: 0;
+  width: 240px !important;
+}
+.durbs-popup .leaflet-popup-tip {
+  border: 3px solid #000;
+  box-shadow: none;
+}
+.durbs-pin {
+  background: transparent;
+  border: none;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}

@@ -1,0 +1,59 @@
+export const EVENT_CATEGORIES = [
+  "Markets",
+  "Concerts",
+  "Popups",
+  "Nightlife",
+  "Festive",
+] as const;
+
+export type EventCategory = (typeof EVENT_CATEGORIES)[number];
+
+export const DURBAN_AREAS = [
+  "Umhlanga",
+  "Morningside",
+  "Durban North",
+  "Ballito",
+  "Central Beachfront",
+  "Point Waterfront",
+] as const;
+
+export type DurbanArea = (typeof DURBAN_AREAS)[number];
+
+export interface DurbsEvent {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  category: EventCategory;
+  venue_name: string;
+  address: string;
+  area: DurbanArea;
+  latitude: number;
+  longitude: number;
+  /** ISO 8601 timestamp */
+  start_date: string;
+  /** ISO 8601 timestamp, optional for single-session events */
+  end_date: string | null;
+  image_url: string | null;
+  ticket_url: string | null;
+  price_text: string | null;
+  is_featured: boolean;
+  is_approved: boolean;
+  created_at?: string;
+}
+
+/** Shape submitted by organisers; moderation flags are set server-side. */
+export type NewEventInput = Omit<
+  DurbsEvent,
+  "id" | "is_featured" | "is_approved" | "created_at"
+>;
+
+export type CategoryFilter = "All" | EventCategory;
+export type DateFilter = "All" | "Today" | "This Weekend" | "Festive Season";
+export type AreaFilter =
+  | "All Areas"
+  | "Umhlanga"
+  | "Morningside"
+  | "Durban North"
+  | "Ballito"
+  | "Beachfront";
