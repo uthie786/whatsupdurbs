@@ -15,7 +15,7 @@ const body = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "WhatsUpDurbs 🌊 | Durban Events, Markets, Pop-ups & Festivals",
+  title: "WhatsUpDurbs | Durban Events, Markets, Pop-ups & Festivals",
   description:
     "The loudest guide to what's happening in Durban — markets, concerts, pop-ups, nightlife and festive season events from Umhlanga to the Point.",
 };

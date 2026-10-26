@@ -94,7 +94,11 @@ export function filterEvents(events: DurbsEvent[], f: EventFilters): DurbsEvent[
 
 export function formatEventDate(event: DurbsEvent): string {
   const start = parseISO(event.start_date);
-  if (!event.end_date) return format(start, "EEE d MMM · HH:mm");
+  if (!event.end_date) {
+    // Imported listings without a known time are stored at midnight.
+    const timeKnown = start.getHours() !== 0 || start.getMinutes() !== 0;
+    return format(start, "EEE d MMM") + (timeKnown ? format(start, " · HH:mm") : " · Time TBC");
+  }
   const end = parseISO(event.end_date);
   if (isSameDay(start, end)) {
     return `${format(start, "EEE d MMM · HH:mm")}–${format(end, "HH:mm")}`;

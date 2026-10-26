@@ -26,9 +26,10 @@ export default function Navbar({
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
         <Link
           href="/"
-          className="shrink-0 -rotate-1 border-3 border-black bg-white px-3 py-1 font-display text-xl tracking-tight shadow-brutal transition-transform hover:rotate-0 sm:text-2xl"
+          className="flex shrink-0 -rotate-1 items-center gap-1.5 border-3 border-black bg-white px-3 py-1 font-display text-xl tracking-tight shadow-brutal transition-transform hover:rotate-0 sm:text-2xl"
         >
-          WhatsUp<span className="text-durbs-pink">Durbs</span> 🌊
+          <span>WhatsUp<span className="text-durbs-pink">Durbs</span></span>
+          <img src="/logo.svg" alt="" aria-hidden className="h-7 w-auto sm:h-8" />
         </Link>
 
         {!compact && (

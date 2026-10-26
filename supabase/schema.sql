@@ -20,8 +20,15 @@ create table if not exists public.events (
   price_text   text,
   is_featured  boolean not null default false,
   is_approved  boolean not null default false,
+  source       text not null default 'manual',
+  external_id  text unique,
   created_at   timestamptz not null default now()
 );
+
+-- Migration for tables created before the Quicket sync existed:
+alter table public.events
+  add column if not exists source text not null default 'manual',
+  add column if not exists external_id text unique;
 
 create index if not exists events_approved_start_idx on public.events (is_approved, start_date);
 
@@ -37,7 +44,8 @@ create policy "Public read approved events"
 drop policy if exists "Public submit pending events" on public.events;
 create policy "Public submit pending events"
   on public.events for insert
-  with check (is_approved = false and is_featured = false);
+  with check (is_approved = false and is_featured = false
+              and source = 'manual' and external_id is null);
 
 -- Signed-in moderators can read everything and approve/feature events.
 -- Tighten this further (e.g. a moderators table or a custom claim) for production.

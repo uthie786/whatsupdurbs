@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Check, Loader2, LogOut, RefreshCw, Star, Undo2 } from "lucide-react";
+import { Check, CloudDownload, Loader2, LogOut, RefreshCw, Star, Undo2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
 import type { DurbsEvent } from "@/types/event";
@@ -15,6 +15,16 @@ import {
 } from "@/lib/supabase";
 
 type Tab = "pending" | "approved";
+
+interface SyncResponse {
+  processed: number;
+  inserted: number;
+  updated: number;
+  failed: number;
+  nextPage: number | null;
+  pages?: number;
+  error?: string;
+}
 
 function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const [email, setEmail] = useState("");
@@ -70,6 +80,8 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -93,6 +105,42 @@ export default function AdminPage() {
   useEffect(() => {
     if (authed) load();
   }, [authed, load]);
+
+  async function syncQuicket() {
+    if (!supabase) return;
+    setSyncing(true);
+    setError(null);
+    const totals = { processed: 0, inserted: 0, updated: 0, failed: 0 };
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Your session expired, please sign in again.");
+      let page: number | null = 1;
+      while (page) {
+        setSyncStatus(`Syncing Quicket… page ${page} · ${totals.inserted} new, ${totals.updated} updated`);
+        const res: Response = await fetch(`/api/sync/quicket?mode=full&startPage=${page}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const body = (await res.json().catch(() => ({}))) as Partial<SyncResponse>;
+        totals.processed += body.processed ?? 0;
+        totals.inserted += body.inserted ?? 0;
+        totals.updated += body.updated ?? 0;
+        totals.failed += body.failed ?? 0;
+        if (!res.ok) throw new Error(body.error || `Sync failed (${res.status})`);
+        page = body.nextPage ?? null;
+      }
+      setSyncStatus(
+        `Quicket sync done: checked ${totals.processed} events · ${totals.inserted} new · ${totals.updated} updated` +
+          (totals.failed ? ` · ${totals.failed} failed` : ""),
+      );
+      await load();
+    } catch (e) {
+      setSyncStatus(null);
+      setError(e instanceof Error ? e.message : "Quicket sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function patch(id: string, flags: Partial<Pick<DurbsEvent, "is_approved" | "is_featured">>) {
     const previous = events;
@@ -122,10 +170,25 @@ export default function AdminPage() {
             <h1 className="font-display text-4xl uppercase leading-none">Admin dashboard</h1>
           </div>
           {authed && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button type="button" onClick={load} className="brutal-btn bg-white">
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
               </button>
+              {supabase && (
+                <button
+                  type="button"
+                  onClick={syncQuicket}
+                  disabled={syncing}
+                  className="brutal-btn bg-durbs-cyan"
+                >
+                  {syncing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CloudDownload className="h-4 w-4" />
+                  )}
+                  Sync Quicket
+                </button>
+              )}
               {supabase && (
                 <button
                   type="button"
@@ -142,6 +205,12 @@ export default function AdminPage() {
         {!isSupabaseConfigured && (
           <p className="border-3 border-black bg-durbs-purple px-4 py-2 text-sm font-bold text-white shadow-brutal">
             Demo mode: changes apply to in-memory sample data only.
+          </p>
+        )}
+
+        {syncStatus && (
+          <p className="border-3 border-black bg-durbs-cyan px-4 py-2 text-sm font-bold shadow-brutal">
+            {syncStatus}
           </p>
         )}
 
@@ -199,6 +268,9 @@ export default function AdminPage() {
                           {event.category}
                         </span>
                         <span className="brutal-badge bg-white">{event.area}</span>
+                        {event.source === "quicket" && (
+                          <span className="brutal-badge bg-black text-white">Quicket</span>
+                        )}
                         {event.is_featured && (
                           <span className="brutal-badge bg-durbs-yellow">
                             <Star className="h-3 w-3 fill-black" /> Featured
