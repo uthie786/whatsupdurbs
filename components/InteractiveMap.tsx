@@ -34,15 +34,19 @@ function pinIcon(color: string, featured: boolean): L.DivIcon {
   return icon;
 }
 
-/** Spread events that share the same coordinates so every pin is clickable. */
-function positionFor(event: DurbsEvent, indexInSpot: number): [number, number] {
+/** Venue coordinates, falling back to the area centre when they're missing. */
+function basePosition(event: DurbsEvent): [number, number] {
   const hasCoords =
     Number.isFinite(event.latitude) &&
     Number.isFinite(event.longitude) &&
     (event.latitude !== 0 || event.longitude !== 0);
-  const [lat, lng] = hasCoords
+  return hasCoords
     ? [event.latitude, event.longitude]
     : AREA_COORDS[event.area] ?? DURBAN_CENTER;
+}
+
+/** Spread events that share the same coordinates so every pin is clickable. */
+function offsetPosition([lat, lng]: [number, number], indexInSpot: number): [number, number] {
   if (indexInSpot === 0) return [lat, lng];
   const angle = indexInSpot * 2.4;
   const radius = 0.0025 * Math.sqrt(indexInSpot);
@@ -69,10 +73,11 @@ function FitToPins({ positions }: { positions: [number, number][] }) {
 export default function InteractiveMap({ events }: InteractiveMapProps) {
   const seen = new Map<string, number>();
   const pins = events.map((event) => {
-    const spot = `${event.latitude.toFixed(3)},${event.longitude.toFixed(3)}`;
+    const base = basePosition(event);
+    const spot = `${base[0].toFixed(3)},${base[1].toFixed(3)}`;
     const idx = seen.get(spot) ?? 0;
     seen.set(spot, idx + 1);
-    return { event, position: positionFor(event, idx) };
+    return { event, position: offsetPosition(base, idx) };
   });
 
   return (

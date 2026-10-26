@@ -29,6 +29,19 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
 
+## Quicket sync
+
+Upcoming public Quicket events within ~45 km of Durban are imported into `events` (published, with "Get Tickets" linking to the Quicket page).
+
+- Set these **server-only** env vars in Vercel (no `NEXT_PUBLIC_` prefix): `QUICKET_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`.
+- Run the migration block in `supabase/schema.sql` (adds `source` and `external_id`, and tightens the public insert policy).
+- A Vercel Cron job (`vercel.json`) runs `/api/sync/quicket?mode=recent` daily at 05:00 SAST, picking up events changed in the last 3 days.
+- On `/admin`, **Sync Quicket** runs a full import (it resumes page by page until done).
+- Re-syncs update an event's details but never override your approve / feature / unpublish choices.
+- Events are matched to the nearest of the six areas for filtering; their map pins use the real venue location.
+
+Past events are hidden from the public site automatically (nothing is deleted).
+
 ## Pages
 
 | Route     | What it does |

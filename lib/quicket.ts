@@ -1,0 +1,208 @@
+// Quicket public events API → WhatsUpDurbs events.
+// Docs: https://docs.quicket.com (GET /api/events?api_key=…&pageSize=…&page=…&lastModified=…)
+import type { DurbanArea, DurbsEvent, EventCategory } from "@/types/event";
+import { AREA_COORDS, DURBAN_CENTER } from "@/lib/areas";
+import { slugify } from "@/lib/filters";
+
+const QUICKET_API = "https://api.quicket.co.za/api";
+
+/** Ballito in the north to Amanzimtoti in the south, inland to Hillcrest. */
+export const DURBAN_RADIUS_KM = 45;
+
+export interface QuicketTicket {
+  price?: number | null;
+  soldOut?: boolean;
+  donation?: boolean;
+}
+
+export interface QuicketEvent {
+  id: number;
+  name: string;
+  description?: string | null;
+  url?: string | null;
+  imageUrl?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  venue?: {
+    name?: string | null;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    latitude?: number | string | null;
+    longitude?: number | string | null;
+  } | null;
+  locality?: { levelOne?: string | null; levelTwo?: string | null; levelThree?: string | null } | null;
+  categories?: { id: number; name: string }[] | null;
+  tickets?: QuicketTicket[] | null;
+}
+
+export interface QuicketListResult {
+  results: QuicketEvent[] | null;
+  pageSize: number;
+  pages: number;
+  records: number;
+  statusCode?: number;
+  message?: string;
+}
+
+export type QuicketEventRow = Omit<DurbsEvent, "id" | "is_featured" | "is_approved" | "created_at"> & {
+  source: "quicket";
+  external_id: string;
+};
+
+export async function fetchQuicketPage(
+  page: number,
+  opts: { pageSize?: number; lastModified?: Date } = {},
+): Promise<QuicketListResult> {
+  const key = process.env.QUICKET_API_KEY;
+  if (!key) throw new Error("QUICKET_API_KEY is not set");
+  const params = new URLSearchParams({
+    api_key: key,
+    pageSize: String(opts.pageSize ?? 100),
+    page: String(page),
+  });
+  if (opts.lastModified) params.set("lastModified", opts.lastModified.toISOString());
+
+  const res = await fetch(`${QUICKET_API}/events?${params}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Quicket API ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return (await res.json()) as QuicketListResult;
+}
+
+/* ------------------------------ Mapping ------------------------------ */
+
+function toRad(deg: number) {
+  return (deg * Math.PI) / 180;
+}
+
+export function distanceKm(a: [number, number], b: [number, number]): number {
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+}
+
+export function isInDurbanRegion(lat: number, lng: number): boolean {
+  return distanceKm(DURBAN_CENTER, [lat, lng]) <= DURBAN_RADIUS_KM;
+}
+
+export function nearestArea(lat: number, lng: number): DurbanArea {
+  let best: DurbanArea = "Central Beachfront";
+  let bestDist = Infinity;
+  for (const [area, coords] of Object.entries(AREA_COORDS) as [DurbanArea, [number, number]][]) {
+    const d = distanceKm(coords, [lat, lng]);
+    if (d < bestDist) {
+      best = area;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+function isFestiveDate(value: string): boolean {
+  const d = parseQuicketDate(value);
+  if (!d) return false;
+  const m = d.getUTCMonth();
+  return m === 11 || (m === 0 && d.getUTCDate() <= 15);
+}
+
+export function mapCategory(e: QuicketEvent): EventCategory {
+  const cats = (e.categories ?? []).map((c) => c.name).join(" ");
+  const text = `${e.name} ${cats}`.toLowerCase();
+  if (/christmas|festive|new year|xmas|carol|santa/.test(text)) return "Festive";
+  if (/market|expo|fair|food|craft|flea|bazaar/.test(text)) return "Markets";
+  if (/party|club|nightlife|\bdj\b|rave|amapiano|gqom|lounge/.test(text)) return "Nightlife";
+  if (/music|concert|festival|live|gig|tour|choir|gospel|jazz|orchestra/.test(text)) return "Concerts";
+  if (isFestiveDate(e.startDate)) return "Festive";
+  return "Popups";
+}
+
+export function priceText(tickets: QuicketTicket[] | null | undefined): string | null {
+  const prices = (tickets ?? [])
+    .filter((t) => !t.donation && typeof t.price === "number" && Number.isFinite(t.price))
+    .map((t) => t.price as number);
+  if (!prices.length) return null;
+  const min = Math.min(...prices);
+  if (min <= 0) return prices.some((p) => p > 0) ? "Free & paid options" : "Free";
+  return `From R${Math.round(min)}`;
+}
+
+export function stripHtml(html: string | null | undefined, max = 400): string {
+  if (!html) return "";
+  const text = html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<br\s*\/?>|<\/p>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&rsquo;|&lsquo;/g, "'")
+    .replace(/&[a-z]+;|&#\d+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+/** Quicket returns local SA times, often without an offset; pin those to SAST. */
+export function parseQuicketDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  let v = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) v += "T00:00:00";
+  const hasZone = /T.*(Z|[+-]\d{2}:?\d{2})$/i.test(v);
+  const d = new Date(hasZone ? v : `${v}+02:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toNumber(v: number | string | null | undefined): number | null {
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  return typeof n === "number" && Number.isFinite(n) && n !== 0 ? n : null;
+}
+
+export type SkipReason = "no-location" | "outside-durban" | "past" | "invalid";
+
+/** Map a Quicket event to a row, or say why it was skipped. */
+export function mapQuicketEvent(
+  e: QuicketEvent,
+  now = new Date(),
+): { row: QuicketEventRow } | { skip: SkipReason } {
+  const start = parseQuicketDate(e?.startDate);
+  if (!e?.id || !e.name || !start) return { skip: "invalid" };
+  const lat = toNumber(e.venue?.latitude);
+  const lng = toNumber(e.venue?.longitude);
+  if (lat === null || lng === null) return { skip: "no-location" };
+  if (!isInDurbanRegion(lat, lng)) return { skip: "outside-durban" };
+
+  const end = parseQuicketDate(e.endDate);
+  if ((end ?? start) < now) return { skip: "past" };
+
+  const address = [e.venue?.addressLine1, e.venue?.addressLine2, e.locality?.levelThree]
+    .filter(Boolean)
+    .join(", ");
+
+  return {
+    row: {
+      title: e.name.trim(),
+      slug: `${slugify(e.name) || "event"}-q${e.id}`,
+      description: stripHtml(e.description),
+      category: mapCategory(e),
+      venue_name: e.venue?.name?.trim() || "Venue TBC",
+      address,
+      area: nearestArea(lat, lng),
+      latitude: lat,
+      longitude: lng,
+      start_date: start.toISOString(),
+      end_date: end && end > start ? end.toISOString() : null,
+      image_url: e.imageUrl || null,
+      ticket_url: e.url || null,
+      price_text: priceText(e.tickets),
+      source: "quicket",
+      external_id: String(e.id),
+    },
+  };
+}

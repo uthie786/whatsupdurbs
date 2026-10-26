@@ -39,13 +39,17 @@ export interface DurbsEvent {
   price_text: string | null;
   is_featured: boolean;
   is_approved: boolean;
+  /** "manual" for submissions/admin entries, "quicket" for synced events. */
+  source?: string;
+  /** ID in the source system, e.g. the Quicket event ID. */
+  external_id?: string | null;
   created_at?: string;
 }
 
 /** Shape submitted by organisers; moderation flags are set server-side. */
 export type NewEventInput = Omit<
   DurbsEvent,
-  "id" | "is_featured" | "is_approved" | "created_at"
+  "id" | "is_featured" | "is_approved" | "created_at" | "source" | "external_id"
 >;
 
 export type CategoryFilter = "All" | EventCategory;

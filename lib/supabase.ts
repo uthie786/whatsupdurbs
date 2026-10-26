@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { addDays, setHours, setMinutes } from "date-fns";
+import { addDays, setHours, setMinutes, startOfDay } from "date-fns";
 import type { DurbsEvent, NewEventInput } from "@/types/event";
 import { AREA_COORDS } from "@/lib/areas";
 import { weekendWindow } from "@/lib/filters";
@@ -257,14 +257,25 @@ const byStartDate = (a: DurbsEvent, b: DurbsEvent) =>
 
 /* ------------------------------ Queries ------------------------------ */
 
+/** Events that haven't finished yet (single-day events stay up all day). */
+function isUpcoming(e: DurbsEvent, now = new Date()): boolean {
+  if (e.end_date) return new Date(e.end_date) >= now;
+  return new Date(e.start_date) >= startOfDay(now);
+}
+
 export async function fetchApprovedEvents(): Promise<DurbsEvent[]> {
   if (!supabase) {
-    return getMockStore().filter((e) => e.is_approved).sort(byStartDate);
+    return getMockStore()
+      .filter((e) => e.is_approved && isUpcoming(e))
+      .sort(byStartDate);
   }
+  const now = new Date().toISOString();
+  const today = startOfDay(new Date()).toISOString();
   const { data, error } = await supabase
     .from(EVENTS_TABLE)
     .select("*")
     .eq("is_approved", true)
+    .or(`end_date.gte.${now},and(end_date.is.null,start_date.gte.${today})`)
     .order("start_date", { ascending: true });
   if (error) throw error;
   return (data ?? []) as DurbsEvent[];
