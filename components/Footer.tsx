@@ -9,9 +9,17 @@ export default function Footer() {
           <span>WhatsUp<span className="text-durbs-pink">Durbs</span></span>
           <img src="/logo.svg" alt="" aria-hidden className="h-7 w-auto" />
         </Link>
-        <p className="text-sm font-semibold text-neutral-300">
-          Made with sunshine &amp; sea salt in Durban. *Roughly.
-        </p>
+        <div className="space-y-1 text-sm font-semibold text-neutral-300">
+          <p>Made with sunshine &amp; sea salt in Durban. *Roughly.</p>
+          <p className="flex gap-3 text-xs">
+            <Link href="/privacy" className="underline hover:text-durbs-yellow">
+              Privacy
+            </Link>
+            <Link href="/data-deletion" className="underline hover:text-durbs-yellow">
+              Data deletion
+            </Link>
+          </p>
+        </div>
         <Link href="/submit" className="brutal-btn bg-durbs-yellow text-black">
           Submit Event <Plus className="h-4 w-4" />
         </Link>

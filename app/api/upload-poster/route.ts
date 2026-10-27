@@ -3,25 +3,12 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { POSTERS_BUCKET } from "@/lib/supabase";
 import { errorMessage } from "@/lib/errors";
 import { clientIp, takeRateLimit } from "@/lib/rateLimit";
+import { IMAGE_EXTENSIONS, sniffImageType } from "@/lib/imageSniff";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const LIMIT = { perIpPerHour: 10, globalPerDay: 300 };
-
-/** Magic bytes, so only real images get stored whatever the client claims. */
-function sniffImageType(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | null {
-  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
-  if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    return "image/png";
-  }
-  if (buf.length > 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") {
-    return "image/webp";
-  }
-  return null;
-}
-
-const EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
 
 /** Store an organiser's poster for a pending submission and return its public URL. */
 export async function POST(req: NextRequest) {
@@ -39,7 +26,7 @@ export async function POST(req: NextRequest) {
   const limited = await takeRateLimit("upload", clientIp(req), LIMIT);
   if (!limited.ok) return NextResponse.json({ error: limited.message }, { status: limited.status });
 
-  const path = `submissions/${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${EXTENSIONS[type]}`;
+  const path = `submissions/${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${IMAGE_EXTENSIONS[type]}`;
   const storage = getSupabaseAdmin().storage.from(POSTERS_BUCKET);
   const { error } = await storage.upload(path, buf, { contentType: type, cacheControl: "31536000" });
   if (error) {

@@ -8,6 +8,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const pages: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, changeFrequency: "hourly", priority: 1 },
     { url: `${SITE_URL}/submit`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/data-deletion`, changeFrequency: "yearly", priority: 0.2 },
   ];
   try {
     const events = await listUpcomingEventSlugs();

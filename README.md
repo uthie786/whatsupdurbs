@@ -100,6 +100,17 @@ Organisers can upload a poster on `/submit`; Gemini pre-fills the form and the p
 
 `/admin` flags events that look like the same event (similar title on an overlapping day), including in the poster review before publishing. **Edit** changes any field or the poster without changing the event's link; edited Quicket events are no longer overwritten by the sync.
 
+## Instagram (official Meta API)
+
+`/admin → Instagram accounts` lists Durban venue/promoter/market accounts to follow. Every hour (Supabase pg_cron → `/api/sync/instagram`) the site reads each account's recent posts through Meta's Graph API **Business Discovery**, copies the image into Supabase Storage (`posters/instagram/`, since Instagram image links expire), and asks Gemini whether the post advertises an upcoming event. Events go to **Pending** with an "Instagram ↗" link to the original post; everything else is recorded so it isn't read twice. If Gemini is busy or out of free quota the remaining posts wait for the next run.
+
+Setup:
+- An Instagram business/creator account linked to a Facebook Page, and a Meta app using the Instagram use case with **Facebook Login**. Reading other accounts needs Advanced Access (App Review) for `instagram_basic` and `pages_read_engagement`.
+- Vercel env vars (server-only): `META_ACCESS_TOKEN` (system-user token), `INSTAGRAM_USER_ID` (your Instagram business account ID), optional `META_GRAPH_VERSION` (default `v21.0`).
+- Run the Instagram block in `supabase/schema.sql` (tables, `source_url` column, hourly `instagram-sync` job with your URL and `CRON_SECRET`).
+- **Test connection** on `/admin` checks the settings, your own account, and reading a followed account, and explains Meta errors.
+- `/privacy` and `/data-deletion` are the URLs to give Meta in the app settings.
+
 ## Pages
 
 | Route     | What it does |
@@ -107,6 +118,7 @@ Organisers can upload a poster on `/submit`; Gemini pre-fills the form and the p
 | `/`       | Hero, featured carousel, interactive Durban map, filters (category / date / area / search) and event grid |
 | `/submit` | Organiser submission form (optionally pre-filled from a poster) → inserted with `is_approved: false` |
 | `/events/<slug>` | Event page with sharing, calendar and save |
+| `/privacy`, `/data-deletion` | Privacy policy and data deletion instructions |
 | `/admin`  | Moderation queue: approve, deny, feature, unpublish, **edit** (incl. replacing the poster); add events from posters; duplicate warnings; Quicket sync |
 
 ### Denying submissions
