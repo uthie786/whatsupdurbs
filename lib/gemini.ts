@@ -1,6 +1,7 @@
 // Server-only: reads event details off a poster image with Google's Gemini API
 // (free tier via an AI Studio key). Plain REST, no SDK.
 import { DURBAN_AREAS, EVENT_CATEGORIES, type DurbanArea, type EventCategory } from "@/types/event";
+import { CATEGORY_INFO } from "@/lib/areas";
 
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-flash-latest";
@@ -75,6 +76,8 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
+const CATEGORY_GUIDE = EVENT_CATEGORIES.map((c) => `  - ${c}: ${CATEGORY_INFO[c].covers}`).join("\n");
+
 function buildPrompt(today: string): string {
   return `You read event posters for WhatsUpDurbs, a guide to events in Durban, South Africa.
 Today is ${today} (Africa/Johannesburg, SAST). Extract the event shown on the poster.
@@ -83,7 +86,8 @@ Rules:
 - Only use what the poster shows. Use null for anything not on the poster; never invent details.
 - title: the event name as printed, in normal capitalisation.
 - description: 1-2 short sentences in your own words about what the event is (performers, theme). No marketing hype.
-- category: one of ${EVENT_CATEGORIES.join(", ")}. Concerts = live music/performances/shows, Markets = markets/expos/fairs/food, Popups = one-off pop-ups, workshops, sports and other events, Nightlife = parties/clubs/DJ nights, Festive = Christmas/New Year/December holiday events.
+- category: exactly one of these (pick the most specific; Popups only if nothing else fits):
+${CATEGORY_GUIDE}
 - area: the closest of ${DURBAN_AREAS.join(", ")} based on the venue, or null if you can't tell. Durban CBD, ICC, Playhouse and Suncoast count as Central Beachfront; uShaka and the Point precinct as Point Waterfront; Sibaya and Gateway as Umhlanga; Florida Road and Berea as Morningside.
 - start_local / end_local: local time as YYYY-MM-DDTHH:mm. If the year isn't printed, use the next occurrence on or after today. If no time is printed, use T00:00 for start and null for end. Use the "doors open" time if no start time is given.
 - price_text: short, e.g. "Free", "R150", "From R200", "R250 – R350".

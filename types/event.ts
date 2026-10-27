@@ -1,9 +1,18 @@
 export const EVENT_CATEGORIES = [
   "Markets",
   "Concerts",
-  "Popups",
   "Nightlife",
   "Festive",
+  "Popups",
+  "Fitness",
+  "Outdoors",
+  "Cars",
+  "Food",
+  "Theatre",
+  "Arts",
+  "Family",
+  "Social",
+  "Workshops",
 ] as const;
 
 export type EventCategory = (typeof EVENT_CATEGORIES)[number];
