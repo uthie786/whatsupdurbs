@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Ban, Check, CloudDownload, Loader2, LogOut, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
+import PosterImport from "@/components/PosterImport";
 import type { DurbsEvent } from "@/types/event";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
@@ -15,6 +16,7 @@ import {
   updateEventFlags,
   type EventFlagsPatch,
 } from "@/lib/supabase";
+import { errorMessage } from "@/lib/errors";
 
 function hoursUntilPurge(deniedAt: string): number {
   const ms = new Date(deniedAt).getTime() + DENIED_RETENTION_MS - Date.now();
@@ -115,7 +117,7 @@ export default function AdminPage() {
     try {
       setEvents(await fetchAllEventsForAdmin());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load events");
+      setError(errorMessage(e, "Failed to load events"));
     } finally {
       setLoading(false);
     }
@@ -156,7 +158,7 @@ export default function AdminPage() {
       await load();
     } catch (e) {
       setSyncStatus(null);
-      setError(e instanceof Error ? e.message : "Quicket sync failed");
+      setError(errorMessage(e, "Quicket sync failed"));
     } finally {
       setSyncing(false);
     }
@@ -179,7 +181,7 @@ export default function AdminPage() {
       setImportUrl("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(errorMessage(err, "Import failed"));
     } finally {
       setImporting(false);
     }
@@ -193,7 +195,7 @@ export default function AdminPage() {
       await updateEventFlags(id, flags);
     } catch (e) {
       setEvents(previous);
-      setError(e instanceof Error ? e.message : "Update failed");
+      setError(errorMessage(e, "Update failed"));
     } finally {
       setBusyId(null);
     }
@@ -251,6 +253,8 @@ export default function AdminPage() {
             Demo mode: changes apply to in-memory sample data only.
           </p>
         )}
+
+        {authed && <PosterImport onPublished={load} />}
 
         {authed && supabase && (
           <form

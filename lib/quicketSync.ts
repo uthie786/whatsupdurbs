@@ -2,6 +2,7 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { DENIED_RETENTION_MS, EVENTS_TABLE } from "@/lib/supabase";
 import type { QuicketEventRow } from "@/lib/quicket";
+import { errorMessage } from "@/lib/errors";
 
 const SYNC_STATE_TABLE = "sync_state";
 const STATE_KEY = "quicket";
@@ -56,19 +57,20 @@ export async function writeSyncState(patch: Partial<SyncState>): Promise<void> {
 
 /** Insert new events as published; update existing ones without touching moderation flags. */
 export async function saveQuicketRows(rows: QuicketEventRow[]) {
-  if (!rows.length) return { inserted: 0, updated: 0, failed: 0 };
+  if (!rows.length) return { inserted: 0, updated: 0, failed: 0, errors: [] as string[] };
   const supabase = getSupabaseAdmin();
   const { data: existing, error } = await supabase
     .from(EVENTS_TABLE)
     .select("external_id")
     .eq("source", "quicket")
     .in("external_id", rows.map((r) => r.external_id));
-  if (error) throw error;
+  if (error) throw new Error(`Looking up existing Quicket events failed: ${errorMessage(error)}`);
 
   const known = new Set((existing ?? []).map((r) => r.external_id as string));
   const fresh = rows.filter((r) => !known.has(r.external_id));
   const stale = rows.filter((r) => known.has(r.external_id));
   let failed = 0;
+  const errors: string[] = [];
 
   if (fresh.length) {
     const toInsert = fresh.map((r) => ({ ...r, is_approved: true, is_featured: false }));
@@ -79,7 +81,8 @@ export async function saveQuicketRows(rows: QuicketEventRow[]) {
         const { error: rowError } = await supabase.from(EVENTS_TABLE).insert(row);
         if (rowError) {
           failed++;
-          console.error(`Quicket insert ${row.external_id} failed: ${rowError.message}`);
+          errors.push(errorMessage(rowError));
+          console.error(`Quicket insert ${row.external_id} failed: ${errorMessage(rowError)}`);
         }
       }
     }
@@ -89,10 +92,10 @@ export async function saveQuicketRows(rows: QuicketEventRow[]) {
     const { error: updateError } = await supabase
       .from(EVENTS_TABLE)
       .upsert(stale, { onConflict: "external_id" });
-    if (updateError) throw updateError;
+    if (updateError) throw new Error(`Updating Quicket events failed: ${errorMessage(updateError)}`);
   }
 
-  return { inserted: fresh.length - failed, updated: stale.length, failed };
+  return { inserted: fresh.length - failed, updated: stale.length, failed, errors };
 }
 
 /** Backup for the Supabase pg_cron job: drop denials older than 24h. */

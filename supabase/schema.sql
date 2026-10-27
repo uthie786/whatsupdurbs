@@ -96,3 +96,33 @@ select cron.schedule(
       headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'),
       timeout_milliseconds := 60000)$$
 );
+
+-- Poster imports: admins publish events directly (as approved).
+drop policy if exists "Admins insert events" on public.events;
+create policy "Admins insert events"
+  on public.events for insert
+  to authenticated
+  with check (true);
+
+-- Public storage bucket for poster images uploaded from /admin.
+insert into storage.buckets (id, name, public)
+values ('posters', 'posters', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Admins upload posters" on storage.objects;
+create policy "Admins upload posters"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'posters');
+
+drop policy if exists "Admins update posters" on storage.objects;
+create policy "Admins update posters"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'posters');
+
+drop policy if exists "Admins delete posters" on storage.objects;
+create policy "Admins delete posters"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'posters');

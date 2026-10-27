@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isAdminRequest } from "@/lib/adminAuth";
 import { QuicketApiError, fetchQuicketEvent, mapQuicketEvent, parseQuicketEventId } from "@/lib/quicket";
 import { saveQuicketRows } from "@/lib/quicketSync";
+import { errorMessage } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,7 +37,10 @@ export async function POST(req: NextRequest) {
     }
     const saved = await saveQuicketRows([mapped.row]);
     if (saved.failed) {
-      return NextResponse.json({ error: "Saving the event failed; check the server logs.", id }, { status: 500 });
+      return NextResponse.json(
+        { error: `Saving the event failed: ${saved.errors[0] ?? "unknown database error"}`, id },
+        { status: 500 },
+      );
     }
     return NextResponse.json({
       ok: true,
@@ -48,9 +52,7 @@ export async function POST(req: NextRequest) {
     const notFound = err instanceof QuicketApiError && err.status === 404;
     const message = notFound
       ? "Quicket couldn't find that event (it may be private or deleted)."
-      : err instanceof Error
-        ? err.message
-        : String(err);
+      : errorMessage(err);
     return NextResponse.json({ error: message, id }, { status: notFound ? 404 : 502 });
   }
 }

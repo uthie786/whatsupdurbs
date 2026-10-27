@@ -8,6 +8,7 @@ import {
   saveQuicketRows,
   writeSyncState,
 } from "@/lib/quicketSync";
+import { errorMessage } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
       ms: Date.now() - started.getTime(),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     console.error("Quicket sync failed:", message);
     if (!dryRun) await writeSyncState({ last_error: message }).catch(() => {});
     return NextResponse.json(
