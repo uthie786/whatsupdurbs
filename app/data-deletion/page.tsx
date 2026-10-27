@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 export default function DataDeletionPage() {
   const subject = encodeURIComponent("Data deletion request");
   return (
-    <LegalPage title="Data Deletion" updated="27 October 2026">
+    <LegalPage title="Data Deletion" updated="28 October 2026">
       <p>
-        You can ask us to delete any information WhatsUpDurbs holds about you or your events at any time. We don&apos;t
-        use Facebook or Instagram login, so we hold no Facebook or Instagram user data about visitors.
+        You can ask us to delete any information WhatsUpDurbs holds about you or your events at any time. Visitors
+        don&apos;t need an account, and we don&apos;t use Facebook, Instagram or Google login.
       </p>
 
       <h2>How to request deletion</h2>
@@ -24,8 +24,8 @@ export default function DataDeletionPage() {
           &quot;Data deletion request&quot;.
         </li>
         <li>
-          Tell us what to remove: for example a link to the event page, the event name and date, or your Instagram
-          username if you&apos;d like us to stop following your account and remove events taken from it.
+          Tell us what to remove: for example a link to the event page, the event name and date, or the
+          organiser or venue name if you&apos;d like all of your events removed.
         </li>
         <li>
           If you&apos;re asking about information that identifies you, we may ask you to confirm you&apos;re the account
@@ -37,8 +37,7 @@ export default function DataDeletionPage() {
       <ul>
         <li>We confirm your request within 7 days.</li>
         <li>
-          We delete the event details, stored poster images and any records linked to you within 30 days, and stop
-          following your Instagram account if you ask.
+          We delete the event details, stored poster images and any records linked to you within 30 days.
         </li>
         <li>We email you when it&apos;s done.</li>
       </ul>

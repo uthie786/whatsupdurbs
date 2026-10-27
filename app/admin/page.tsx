@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { AlertTriangle, Ban, Check, CloudDownload, Loader2, LogOut, Pencil, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
-import PosterImport from "@/components/PosterImport";
-import InstagramPanel from "@/components/InstagramPanel";
+import BulkPosterImport from "@/components/BulkPosterImport";
 import EditEventPanel from "@/components/EditEventPanel";
 import { findLikelyDuplicates } from "@/lib/duplicates";
 import type { DurbsEvent } from "@/types/event";
@@ -245,9 +244,7 @@ export default function AdminPage() {
           </p>
         )}
 
-        {authed && <PosterImport onPublished={load} existingEvents={events} />}
-
-        {authed && supabase && <InstagramPanel getToken={adminToken} onSynced={load} />}
+        {authed && <BulkPosterImport onPublished={load} existingEvents={events} />}
 
         {syncNotice && (
           <p className="border-3 border-black bg-durbs-yellow px-4 py-2 text-sm font-bold shadow-brutal">
@@ -322,16 +319,6 @@ export default function AdminPage() {
                         <span className="brutal-badge bg-white">{event.area}</span>
                         {event.source === "quicket" && (
                           <span className="brutal-badge bg-black text-white">Quicket</span>
-                        )}
-                        {event.source === "instagram" && (
-                          <a
-                            href={event.source_url ?? undefined}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="brutal-badge bg-durbs-purple text-white hover:underline"
-                          >
-                            Instagram ↗
-                          </a>
                         )}
                         {event.denied_at && !event.is_approved && (
                           <span className="brutal-badge bg-red-500 text-white">

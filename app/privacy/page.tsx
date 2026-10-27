@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="27 October 2026">
+    <LegalPage title="Privacy Policy" updated="28 October 2026">
       <p>
         WhatsUpDurbs (&quot;we&quot;, &quot;us&quot;) is a free guide to events in Durban, South Africa, at{" "}
         <Link href="/">whatsupdurbs.vercel.app</Link>. This policy explains what information we handle, why, and your
@@ -53,11 +53,10 @@ export default function PrivacyPage() {
       <h2>3. Events we collect from public sources</h2>
       <ul>
         <li>
-          <strong>Instagram:</strong> we use Meta&apos;s official Instagram API to read recent public posts from Instagram
-          business and creator accounts of Durban venues, promoters and markets we follow. We only use posts that
-          advertise upcoming public events. We store the event details, a copy of the poster image, and a link back to
-          the original post. We do not access personal Instagram accounts, private messages, followers, or any data
-          about people who view or interact with those posts.
+          <strong>Public event posters:</strong> our team may add events from posters that venues, promoters and
+          organisers publish publicly (for example on their websites or social media). We store the event details and
+          a copy of the poster, and credit or link the organiser where possible. We don&apos;t collect information about
+          people who view or interact with those posts.
         </li>
         <li>
           <strong>Quicket:</strong> we use Quicket&apos;s public API to list public events near Durban, linking back to
@@ -71,8 +70,7 @@ export default function PrivacyPage() {
 
       <h2>5. Who processes data for us</h2>
       <p>
-        Vercel (website hosting), Supabase (database and image storage), Google (Gemini AI), Meta (Instagram API),
-        Quicket (event listings) and OpenStreetMap (maps). Some of these process data outside South Africa. We don&apos;t
+        Vercel (website hosting), Supabase (database and image storage), Google (Gemini AI), Quicket (event listings) and OpenStreetMap (maps). Some of these process data outside South Africa. We don&apos;t
         sell personal information or use it for advertising.
       </p>
 
@@ -85,8 +83,8 @@ export default function PrivacyPage() {
 
       <h2>7. Your rights and removal requests</h2>
       <p>
-        You can ask us what information we hold about you, ask us to correct it, or ask us to delete it. If you run an
-        Instagram account or event that appears here and want it removed or no longer followed, email us. See our{" "}
+        You can ask us what information we hold about you, ask us to correct it, or ask us to delete it. If you organise
+        an event that appears here and want it changed or removed, email us. See our{" "}
         <Link href="/data-deletion">data deletion instructions</Link>. You may also complain to South Africa&apos;s
         Information Regulator.
       </p>
