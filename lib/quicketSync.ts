@@ -59,16 +59,25 @@ export async function writeSyncState(patch: Partial<SyncState>): Promise<void> {
 export async function saveQuicketRows(rows: QuicketEventRow[]) {
   if (!rows.length) return { inserted: 0, updated: 0, failed: 0, errors: [] as string[] };
   const supabase = getSupabaseAdmin();
-  const { data: existing, error } = await supabase
-    .from(EVENTS_TABLE)
-    .select("external_id")
-    .eq("source", "quicket")
-    .in("external_id", rows.map((r) => r.external_id));
+  const lookup = (columns: string) =>
+    supabase
+      .from(EVENTS_TABLE)
+      .select(columns)
+      .eq("source", "quicket")
+      .in("external_id", rows.map((r) => r.external_id));
+  let { data: existing, error } = await lookup("external_id, edited_at");
+  if (error && (error.code === "42703" || error.code === "PGRST204")) {
+    // Database without the edited_at column yet: treat nothing as edited.
+    ({ data: existing, error } = await lookup("external_id"));
+  }
   if (error) throw new Error(`Looking up existing Quicket events failed: ${errorMessage(error)}`);
 
-  const known = new Set((existing ?? []).map((r) => r.external_id as string));
+  const rowsFound = (existing ?? []) as unknown as { external_id: string; edited_at?: string | null }[];
+  const known = new Set(rowsFound.map((r) => r.external_id));
+  // Events an admin has edited keep their edits; the sync no longer updates them.
+  const edited = new Set(rowsFound.filter((r) => r.edited_at).map((r) => r.external_id));
   const fresh = rows.filter((r) => !known.has(r.external_id));
-  const stale = rows.filter((r) => known.has(r.external_id));
+  const stale = rows.filter((r) => known.has(r.external_id) && !edited.has(r.external_id));
   let failed = 0;
   const errors: string[] = [];
 

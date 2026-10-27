@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Ban, Check, CloudDownload, Loader2, LogOut, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertTriangle, Ban, Check, CloudDownload, Loader2, LogOut, Pencil, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
 import PosterImport from "@/components/PosterImport";
+import EditEventPanel from "@/components/EditEventPanel";
+import { findLikelyDuplicates } from "@/lib/duplicates";
 import type { DurbsEvent } from "@/types/event";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
@@ -35,6 +37,7 @@ interface SyncResponse {
   notes?: string[];
   lastSuccess?: string | null;
   error?: string;
+  transient?: boolean;
 }
 
 function minutesAgo(iso: string): string {
@@ -101,6 +104,8 @@ export default function AdminPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -136,17 +141,21 @@ export default function AdminPage() {
     if (!supabase) return;
     setSyncing(true);
     setError(null);
+    setSyncNotice(null);
     setSyncStatus("Syncing Quicket… this can take up to a minute (Quicket is slow).");
     try {
       const res = await fetch("/api/sync/quicket", {
         headers: { Authorization: `Bearer ${await adminToken()}` },
       });
       const body = (await res.json().catch(() => ({}))) as Partial<SyncResponse>;
+      const lastOk = body.lastSuccess ? ` Last successful sync ${minutesAgo(body.lastSuccess)}.` : "";
+      if (body.transient) {
+        setSyncNotice(`${body.error}${lastOk}`);
+        setSyncStatus(null);
+        return;
+      }
       if (!res.ok || !body.ok) {
-        throw new Error(
-          (body.error || `Sync failed (${res.status})`) +
-            (body.lastSuccess ? ` · Last successful sync ${minutesAgo(body.lastSuccess)}.` : ""),
-        );
+        throw new Error((body.error || `Sync failed (${res.status})`) + lastOk);
       }
       setSyncStatus(
         `Quicket sync done: ${body.processed ?? 0} changed events checked · ${body.inserted ?? 0} new · ${body.updated ?? 0} updated` +
@@ -180,6 +189,12 @@ export default function AdminPage() {
   const approved = events.filter((e) => e.is_approved);
   const denied = events.filter((e) => !e.is_approved && e.denied_at);
   const visible = tab === "pending" ? pending : tab === "approved" ? approved : denied;
+
+  // Likely duplicates among live and pending events (denied ones are on their way out).
+  const duplicatesById = useMemo(() => {
+    const active = events.filter((e) => !e.denied_at);
+    return new Map(active.map((e) => [e.id, findLikelyDuplicates(e, active)]));
+  }, [events]);
 
   return (
     <>
@@ -229,7 +244,13 @@ export default function AdminPage() {
           </p>
         )}
 
-        {authed && <PosterImport onPublished={load} />}
+        {authed && <PosterImport onPublished={load} existingEvents={events} />}
+
+        {syncNotice && (
+          <p className="border-3 border-black bg-durbs-yellow px-4 py-2 text-sm font-bold shadow-brutal">
+            ⏳ {syncNotice}
+          </p>
+        )}
 
         {syncStatus && (
           <p className="border-3 border-black bg-durbs-cyan px-4 py-2 text-sm font-bold shadow-brutal">
@@ -309,7 +330,18 @@ export default function AdminPage() {
                             <Star className="h-3 w-3 fill-black" /> Featured
                           </span>
                         )}
+                        {event.edited_at && <span className="brutal-badge bg-white">Edited</span>}
                       </div>
+                      {(duplicatesById.get(event.id) ?? []).length > 0 && (
+                        <p className="flex items-start gap-1 text-xs font-black text-durbs-pink">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          Possible duplicate of{" "}
+                          {(duplicatesById.get(event.id) ?? [])
+                            .slice(0, 2)
+                            .map((d) => `"${d.title}"${d.is_approved ? "" : " (pending)"}`)
+                            .join(", ")}
+                        </p>
+                      )}
                       <h2 className="font-display text-lg uppercase">{event.title}</h2>
                       <p className="text-xs font-bold">
                         {formatEventDate(event)} · {event.venue_name}
@@ -328,6 +360,14 @@ export default function AdminPage() {
                       )}
                     </div>
                     <div className="flex flex-row flex-wrap gap-2 sm:flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(editingId === event.id ? null : event.id)}
+                        aria-expanded={editingId === event.id}
+                        className="brutal-btn bg-white !text-xs"
+                      >
+                        <Pencil className="h-4 w-4" /> Edit
+                      </button>
                       {event.denied_at && !event.is_approved ? (
                         <button
                           type="button"
@@ -393,6 +433,20 @@ export default function AdminPage() {
                         </>
                       )}
                     </div>
+                    {editingId === event.id && (
+                      <EditEventPanel
+                        event={event}
+                        onCancel={() => setEditingId(null)}
+                        onSaved={(changes) => {
+                          setEvents((list) =>
+                            list.map((e) =>
+                              e.id === event.id ? { ...e, ...changes, edited_at: new Date().toISOString() } : e,
+                            ),
+                          );
+                          setEditingId(null);
+                        }}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>

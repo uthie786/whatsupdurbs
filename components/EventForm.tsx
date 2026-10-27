@@ -10,6 +10,8 @@ import {
 } from "@/types/event";
 import { AREA_COORDS } from "@/lib/areas";
 import { slugify } from "@/lib/filters";
+import { fromSastLocalInput, toSastLocalInput } from "@/lib/time";
+import type { DurbsEvent } from "@/types/event";
 
 export interface EventFormState {
   title: string;
@@ -42,16 +44,34 @@ export const EMPTY_EVENT_FORM: EventFormState = {
   description: "",
 };
 
+/** Pre-fill the form from an existing event (times shown in Durban time). */
+export function eventToForm(event: DurbsEvent): EventFormState {
+  return {
+    title: event.title,
+    category: event.category,
+    start_date: toSastLocalInput(event.start_date),
+    end_date: toSastLocalInput(event.end_date),
+    venue_name: event.venue_name,
+    address: event.address ?? "",
+    area: event.area,
+    price_text: event.price_text ?? "",
+    image_url: event.image_url ?? "",
+    ticket_url: event.ticket_url ?? "",
+    description: event.description ?? "",
+  };
+}
+
 /** Validate the form and turn it into an event row, or explain what's wrong. */
 export function buildEventInput(
   form: EventFormState,
 ): { input: NewEventInput } | { error: string } {
-  const start = new Date(form.start_date);
-  const end = form.end_date ? new Date(form.end_date) : null;
+  // Times are entered in Durban time, whatever timezone the browser is in.
+  const start = fromSastLocalInput(form.start_date);
+  const end = form.end_date ? fromSastLocalInput(form.end_date) : null;
   if (!form.title.trim()) return { error: "Please add a title." };
   if (!form.venue_name.trim()) return { error: "Please add a venue." };
-  if (Number.isNaN(start.getTime())) return { error: "Please add a valid start date." };
-  if (end && Number.isNaN(end.getTime())) return { error: "Please add a valid end date." };
+  if (!start) return { error: "Please add a valid start date." };
+  if (form.end_date && !end) return { error: "Please add a valid end date." };
   if (end && end < start) return { error: "End date can't be before the start date." };
 
   const [latitude, longitude] = AREA_COORDS[form.area];

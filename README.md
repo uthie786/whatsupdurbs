@@ -47,8 +47,25 @@ create policy "Public submit pending events"
               and source = 'manual' and external_id is null
               and denied_at is null);
 
+alter table public.events add column if not exists edited_at timestamptz;
+
+create table if not exists public.api_usage (
+  id bigserial primary key, ip text not null, kind text not null,
+  created_at timestamptz not null default now());
+create index if not exists api_usage_lookup on public.api_usage (kind, ip, created_at);
+alter table public.api_usage enable row level security;
+
 notify pgrst, 'reload schema';
 ```
+
+## Visitor features
+
+- **Event pages** at `/events/<slug>`: poster, details, map with directions, Get Tickets, WhatsApp / native share / copy link, add to calendar and save. Link previews (WhatsApp, Facebook, X) show the poster, and schema.org `Event` data helps Google list events. Pages refresh from the database at most every 5 minutes.
+- **Add to calendar**: Google Calendar link or an `.ics` file for Apple Calendar / Outlook (all-day when the time is TBC).
+- **Saved events**: the ❤️ button stores events in the visitor's browser (no account); the **Saved** filter shows only those.
+- **Near me**: asks for the visitor's location (only when they tap it), sorts events by distance and shows them on the map.
+- `sitemap.xml` and `robots.txt` are generated. Set `NEXT_PUBLIC_SITE_URL` if the site isn't at `https://whatsupdurbs.vercel.app`.
+- All dates are shown in Durban time (SAST), whatever the visitor's or server's timezone.
 
 ## Quicket sync
 
@@ -75,13 +92,22 @@ Setup:
 - Run the "Poster imports" block at the end of `supabase/schema.sql` (storage bucket, upload policies, admin insert policy).
 - The free tier has request limits and Google may use free-tier inputs to improve its products. If reading fails, the form still opens with the poster attached so you can type the details in.
 
+### Organiser posters on /submit
+
+Organisers can upload a poster on `/submit`; Gemini pre-fills the form and the poster becomes the event image (stored under `posters/submissions/`). To protect the free Gemini quota these public endpoints are rate-limited via the `api_usage` table: poster reading 5/hour per IP and 150/day site-wide, uploads 10/hour per IP and 300/day. Admin requests aren't limited.
+
+### Duplicates and edits
+
+`/admin` flags events that look like the same event (similar title on an overlapping day), including in the poster review before publishing. **Edit** changes any field or the poster without changing the event's link; edited Quicket events are no longer overwritten by the sync.
+
 ## Pages
 
 | Route     | What it does |
 |-----------|--------------|
 | `/`       | Hero, featured carousel, interactive Durban map, filters (category / date / area / search) and event grid |
-| `/submit` | Organiser submission form → inserted with `is_approved: false` |
-| `/admin`  | Moderation queue: 1-click approve, deny, feature/unfeature, unpublish; add events from posters; Quicket sync |
+| `/submit` | Organiser submission form (optionally pre-filled from a poster) → inserted with `is_approved: false` |
+| `/events/<slug>` | Event page with sharing, calendar and save |
+| `/admin`  | Moderation queue: approve, deny, feature, unpublish, **edit** (incl. replacing the poster); add events from posters; duplicate warnings; Quicket sync |
 
 ### Denying submissions
 

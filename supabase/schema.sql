@@ -127,5 +127,18 @@ create policy "Admins delete posters"
   to authenticated
   using (bucket_id = 'posters');
 
+-- Admin edits: once set, the Quicket sync stops overwriting the event.
+alter table public.events add column if not exists edited_at timestamptz;
+
+-- Rate limiting for public poster reading/uploads on /submit (service role only).
+create table if not exists public.api_usage (
+  id         bigserial primary key,
+  ip         text not null,
+  kind       text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists api_usage_lookup on public.api_usage (kind, ip, created_at);
+alter table public.api_usage enable row level security;
+
 -- Make PostgREST pick up new columns immediately.
 notify pgrst, 'reload schema';

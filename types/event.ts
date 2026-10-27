@@ -45,13 +45,15 @@ export interface DurbsEvent {
   external_id?: string | null;
   /** Set when an admin denies a submission; the row is purged 24h later. */
   denied_at?: string | null;
+  /** Set when an admin edits the event; the Quicket sync then leaves it alone. */
+  edited_at?: string | null;
   created_at?: string;
 }
 
 /** Shape submitted by organisers; moderation flags are set server-side. */
 export type NewEventInput = Omit<
   DurbsEvent,
-  "id" | "is_featured" | "is_approved" | "created_at" | "source" | "external_id" | "denied_at"
+  "id" | "is_featured" | "is_approved" | "created_at" | "source" | "external_id" | "denied_at" | "edited_at"
 >;
 
 export type CategoryFilter = "All" | EventCategory;

@@ -1,194 +1,89 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { ImagePlus, Loader2, Send, Sparkles, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { AlertTriangle, Loader2, Send, Sparkles, X } from "lucide-react";
 import EventFormFields, {
   EMPTY_EVENT_FORM,
   buildEventInput,
   type EventFormKey,
   type EventFormState,
 } from "./EventForm";
+import PosterDropZone from "./PosterDropZone";
+import type { DurbsEvent } from "@/types/event";
 import { publishEvent, supabase, uploadPoster } from "@/lib/supabase";
 import { errorMessage } from "@/lib/errors";
-import type { PosterFields } from "@/lib/gemini";
+import { usePosterReader } from "@/lib/usePosterReader";
+import { findLikelyDuplicates } from "@/lib/duplicates";
+import { fromSastLocalInput } from "@/lib/time";
+import { formatEventDate } from "@/lib/filters";
 
-const MAX_SIDE = 1600;
-
-/** Shrink to at most 1600px on the longest side and re-encode as JPEG. */
-async function resizeImage(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Your browser couldn't process the image.");
-  ctx.fillStyle = "#ffffff"; // flatten transparent PNGs
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't encode the image."))), "image/jpeg", 0.85),
-  );
+async function adminToken(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+interface PosterImportProps {
+  onPublished: () => void;
+  /** Events already on the site, to warn about duplicates before publishing. */
+  existingEvents?: DurbsEvent[];
 }
 
-/** Fill the form from the AI's reading and flag anything it couldn't read. */
-function formFromFields(f: PosterFields): { form: EventFormState; flagged: Set<EventFormKey> } {
-  const flagged = new Set<EventFormKey>();
-  const pick = <K extends EventFormKey>(key: K, value: EventFormState[K] | null, required = false) => {
-    if (value === null || value === "") {
-      if (required) flagged.add(key);
-      return EMPTY_EVENT_FORM[key];
-    }
-    return value;
-  };
-  const form: EventFormState = {
-    ...EMPTY_EVENT_FORM,
-    title: pick("title", f.title, true),
-    description: pick("description", f.description, true),
-    category: pick("category", f.category, true),
-    venue_name: pick("venue_name", f.venue_name, true),
-    address: pick("address", f.address),
-    area: pick("area", f.area, true),
-    start_date: pick("start_date", f.start_local, true),
-    end_date: pick("end_date", f.end_local),
-    price_text: pick("price_text", f.price_text),
-    ticket_url: pick("ticket_url", f.ticket_url),
-  };
-  // A midnight start usually means the poster had no time on it.
-  if (form.start_date.endsWith("T00:00")) flagged.add("start_date");
-  return { form, flagged };
-}
-
-type Stage = "idle" | "reading" | "review" | "publishing";
-
-export default function PosterImport({ onPublished }: { onPublished: () => void }) {
-  const [stage, setStage] = useState<Stage>("idle");
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+export default function PosterImport({ onPublished, existingEvents = [] }: PosterImportProps) {
+  const reader = usePosterReader(adminToken);
   const [form, setForm] = useState<EventFormState>(EMPTY_EVENT_FORM);
   const [flagged, setFlagged] = useState<Set<EventFormKey>>(new Set());
-  const [notes, setNotes] = useState<string | null>(null);
-  const [model, setModel] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => () => {
-    if (preview) URL.revokeObjectURL(preview);
-  }, [preview]);
+  const { read } = reader;
+  const reviewing = reader.stage === "ready" && Boolean(reader.blob);
 
   const reset = () => {
-    setStage("idle");
-    setBlob(null);
-    setPreview(null);
+    reader.reset();
     setForm(EMPTY_EVENT_FORM);
     setFlagged(new Set());
-    setNotes(null);
-    setModel(null);
-    setError(null);
   };
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      setError("That isn't an image. Use a JPEG, PNG or WebP poster.");
-      return;
-    }
-    setError(null);
-    setSuccess(null);
-    setNotes(null);
-    setStage("reading");
-    let resized: Blob;
-    try {
-      resized = await resizeImage(file);
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't open that image."));
-      setStage("idle");
-      return;
-    }
-    setBlob(resized);
-    setPreview(URL.createObjectURL(resized));
+  const handleFile = useCallback(
+    async (file: File) => {
+      setSuccess(null);
+      const result = await read(file);
+      setForm(result?.form ?? EMPTY_EVENT_FORM);
+      setFlagged(result?.flagged ?? new Set());
+    },
+    [read],
+  );
 
-    try {
-      if (!supabase) throw new Error("Demo mode: AI reading needs Supabase and a Gemini key.");
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("Your session expired, please sign in again.");
-      const res = await fetch("/api/extract-poster", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ imageBase64: await blobToBase64(resized), mimeType: "image/jpeg" }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        fields?: PosterFields;
-        notes?: string | null;
-        model?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.fields) throw new Error(body.error || `Reading the poster failed (${res.status}).`);
-      const filled = formFromFields(body.fields);
-      setForm(filled.form);
-      setFlagged(filled.flagged);
-      setNotes(body.notes ?? null);
-      setModel(body.model ?? null);
-    } catch (err) {
-      // Still let the admin enter the details by hand, with the poster attached.
-      setError(`${errorMessage(err)} You can still fill in the details below.`);
-      setForm(EMPTY_EVENT_FORM);
-      setFlagged(new Set());
-    }
-    setStage("review");
-  }, []);
-
-  // Paste a poster from the clipboard anywhere on the admin page.
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      if (stage !== "idle") return;
-      const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
-      if (file) {
-        e.preventDefault();
-        void handleFile(file);
-      }
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [stage, handleFile]);
-
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) void handleFile(file);
-  };
+  const duplicates = useMemo(() => {
+    const start = fromSastLocalInput(form.start_date);
+    if (!form.title.trim() || !start) return [];
+    const end = form.end_date ? fromSastLocalInput(form.end_date) : null;
+    return findLikelyDuplicates(
+      { title: form.title, start_date: start.toISOString(), end_date: end?.toISOString() ?? null },
+      existingEvents.filter((e) => !e.denied_at),
+    );
+  }, [form.title, form.start_date, form.end_date, existingEvents]);
 
   async function publish() {
-    if (!blob) return;
-    setError(null);
+    if (!reader.blob) return;
+    reader.setError(null);
     const built = buildEventInput(form);
     if ("error" in built) {
-      setError(built.error);
+      reader.setError(built.error);
       return;
     }
-    setStage("publishing");
+    setPublishing(true);
     try {
-      const imageUrl = await uploadPoster(blob);
+      const imageUrl = await uploadPoster(reader.blob);
       await publishEvent({ ...built.input, image_url: imageUrl });
       setSuccess(`"${built.input.title}" is live.`);
       reset();
       onPublished();
     } catch (err) {
-      setError(errorMessage(err, "Publishing failed"));
-      setStage("review");
+      reader.setError(errorMessage(err, "Publishing failed"));
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -198,96 +93,84 @@ export default function PosterImport({ onPublished }: { onPublished: () => void 
         <h2 className="flex items-center gap-2 font-display text-xl uppercase">
           <Sparkles className="h-5 w-5" /> Add event from poster
         </h2>
-        {stage === "review" && (
+        {reviewing && (
           <button type="button" onClick={reset} className="brutal-btn bg-white !py-1 !text-xs">
             <X className="h-3.5 w-3.5" /> Discard
           </button>
         )}
       </div>
 
-      {success && (
-        <p className="border-3 border-black bg-green-400 px-3 py-2 text-sm font-bold">{success}</p>
-      )}
-      {error && (
+      {success && <p className="border-3 border-black bg-green-400 px-3 py-2 text-sm font-bold">{success}</p>}
+      {reader.error && (
         <p role="alert" className="border-3 border-black bg-red-500 px-3 py-2 text-sm font-bold text-white">
-          {error}
+          {reader.error}
         </p>
       )}
 
-      {stage === "idle" && (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          className={`flex flex-col items-center justify-center gap-3 border-4 border-dashed border-black p-8 text-center transition-colors ${
-            dragging ? "bg-durbs-cyan" : "bg-durbs-yellow/30"
-          }`}
-        >
-          <ImagePlus className="h-10 w-10" />
-          <p className="font-display uppercase">Drop a poster here, paste it, or</p>
-          <button type="button" onClick={() => fileInput.current?.click()} className="brutal-btn bg-durbs-pink text-white">
-            Choose image
-          </button>
-          <p className="text-xs font-semibold text-neutral-600">
-            One poster per image. The AI fills in the details for you to check before publishing.
-          </p>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void handleFile(file);
-            }}
-          />
-        </div>
+      {reader.stage === "idle" && (
+        <PosterDropZone
+          onFile={handleFile}
+          listenForPaste
+          hint="One poster per image. The AI fills in the details for you to check before publishing."
+        />
       )}
 
-      {stage === "reading" && (
+      {reader.stage === "reading" && (
         <div className="flex items-center gap-3 border-3 border-black bg-durbs-cyan p-6 font-display uppercase">
           <Loader2 className="h-6 w-6 animate-spin" /> Reading poster…
         </div>
       )}
 
-      {(stage === "review" || stage === "publishing") && (
+      {reviewing && (
         <div className="grid gap-6 md:grid-cols-[minmax(0,280px)_1fr]">
           <div className="space-y-2">
-            {preview && (
-              <img src={preview} alt="Poster" className="w-full border-3 border-black shadow-brutal" />
+            {reader.preview && (
+              <img src={reader.preview} alt="Poster" className="w-full border-3 border-black shadow-brutal" />
             )}
             <p className="text-xs font-semibold text-neutral-600">This poster becomes the event image.</p>
           </div>
           <div className="space-y-4">
-            {model && (
-              <p className="text-xs font-bold text-neutral-600">Read by {model}. Check every field before publishing.</p>
-            )}
-            {notes && (
-              <p className="border-3 border-black bg-durbs-yellow px-3 py-2 text-sm font-bold">AI note: {notes}</p>
-            )}
-            {flagged.size > 0 && (
-              <p className="text-sm font-bold">
-                Highlighted fields weren&apos;t clear on the poster. Please check them.
+            {reader.model && (
+              <p className="text-xs font-bold text-neutral-600">
+                Read by {reader.model}. Check every field before publishing.
               </p>
             )}
+            {reader.notes && (
+              <p className="border-3 border-black bg-durbs-yellow px-3 py-2 text-sm font-bold">AI note: {reader.notes}</p>
+            )}
+            {flagged.size > 0 && (
+              <p className="text-sm font-bold">Highlighted fields weren&apos;t clear on the poster. Please check them.</p>
+            )}
             <EventFormFields form={form} onChange={setForm} flagged={flagged} hideImageUrl />
+            {duplicates.length > 0 && (
+              <div className="flex gap-2 border-3 border-black bg-durbs-yellow px-3 py-2 text-sm font-bold">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <div>
+                  This looks like an event that&apos;s already listed:
+                  <ul className="mt-1 list-disc pl-5 font-semibold">
+                    {duplicates.slice(0, 3).map((d) => (
+                      <li key={d.id}>
+                        {d.title} · {formatEventDate(d)}
+                        {!d.is_approved && " (pending)"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
             <button
               type="button"
               onClick={publish}
-              disabled={stage === "publishing"}
+              disabled={publishing}
               className="brutal-btn w-full bg-durbs-pink py-3 text-base text-white"
             >
-              {stage === "publishing" ? (
+              {publishing ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" /> Publishing…
                 </>
               ) : (
                 <>
-                  Publish event <Send className="h-4 w-4" />
+                  {duplicates.length ? "Publish anyway" : "Publish event"} <Send className="h-4 w-4" />
                 </>
               )}
             </button>

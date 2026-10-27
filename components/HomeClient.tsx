@@ -6,11 +6,15 @@ import { ArrowDown, Plus, Waves } from "lucide-react";
 import type { AreaFilter, CategoryFilter, DateFilter, DurbsEvent } from "@/types/event";
 import { fetchApprovedEvents, isSupabaseConfigured } from "@/lib/supabase";
 import { EMPTY_RANGE, filterEvents, type DateRange } from "@/lib/filters";
+import { distanceKm, eventPosition } from "@/lib/geo";
+import { useSavedEvents } from "@/lib/useSavedEvents";
+import { useNearMe } from "@/lib/useNearMe";
 import Navbar from "./Navbar";
 import FeaturedCarousel from "./FeaturedCarousel";
 import MapSection from "./MapSection";
 import FilterBar from "./FilterBar";
 import EventGrid from "./EventGrid";
+import Footer from "./Footer";
 
 const MARQUEE = [
   "Markets",
@@ -33,6 +37,9 @@ export default function HomeClient() {
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [date, setDate] = useState<DateFilter>("All");
   const [range, setRange] = useState<DateRange>(EMPTY_RANGE);
+  const [savedOnly, setSavedOnly] = useState(false);
+  const { saved, count: savedCount } = useSavedEvents();
+  const nearMe = useNearMe();
 
   // Quick "When" chips and the custom range are mutually exclusive.
   const changeDate = (value: DateFilter) => {
@@ -58,9 +65,21 @@ export default function HomeClient() {
     };
   }, []);
 
+  const matching = useMemo(() => {
+    const list = filterEvents(events, { search, area, category, date, range });
+    return savedOnly ? list.filter((e) => saved.has(e.id)) : list;
+  }, [events, search, area, category, date, range, savedOnly, saved]);
+
+  // With "near me" on, closest events come first and cards show the distance.
+  const distances = useMemo(() => {
+    if (!nearMe.location) return null;
+    const here = nearMe.location;
+    return new Map(matching.map((e) => [e.id, distanceKm(here, eventPosition(e))]));
+  }, [matching, nearMe.location]);
+
   const filtered = useMemo(
-    () => filterEvents(events, { search, area, category, date, range }),
-    [events, search, area, category, date, range],
+    () => (distances ? [...matching].sort((a, b) => distances.get(a.id)! - distances.get(b.id)!) : matching),
+    [matching, distances],
   );
   const featured = useMemo(() => events.filter((e) => e.is_featured), [events]);
 
@@ -70,6 +89,7 @@ export default function HomeClient() {
     setCategory("All");
     setDate("All");
     setRange(EMPTY_RANGE);
+    setSavedOnly(false);
   };
 
   return (
@@ -159,7 +179,15 @@ export default function HomeClient() {
 
         <FeaturedCarousel events={featured} />
 
-        <MapSection events={filtered} dateRange={range} onDateRangeChange={changeRange} />
+        <MapSection
+          events={filtered}
+          dateRange={range}
+          onDateRangeChange={changeRange}
+          nearMeStatus={nearMe.status}
+          onNearMeToggle={nearMe.toggle}
+          nearMeError={nearMe.error}
+          userLocation={nearMe.location}
+        />
 
         <section id="events" className="mx-auto max-w-7xl scroll-mt-28 space-y-6 px-4 py-10">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -179,26 +207,33 @@ export default function HomeClient() {
             dateRange={range}
             onDateRangeChange={changeRange}
             onAreaChange={setArea}
+            savedOnly={savedOnly}
+            savedCount={savedCount}
+            onSavedOnlyChange={setSavedOnly}
+            nearMeStatus={nearMe.status}
+            onNearMeToggle={nearMe.toggle}
             onReset={resetFilters}
           />
-          <EventGrid events={filtered} loading={loading} onReset={resetFilters} />
+          {nearMe.status === "on" && (
+            <p className="text-xs font-bold text-neutral-600">
+              Sorted by distance from you. Events listed by area use the area centre.
+            </p>
+          )}
+          <EventGrid
+            events={filtered}
+            loading={loading}
+            onReset={resetFilters}
+            distances={distances}
+            emptyMessage={
+              savedOnly && savedCount === 0
+                ? "No saved events yet. Tap the ❤️ on any event to keep it here."
+                : undefined
+            }
+          />
         </section>
       </main>
 
-      <footer className="border-t-4 border-black bg-black text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-8">
-          <p className="flex items-center gap-1.5 font-display text-xl">
-            <span>WhatsUp<span className="text-durbs-pink">Durbs</span></span>
-            <img src="/logo.svg" alt="" aria-hidden className="h-7 w-auto" />
-          </p>
-          <p className="text-sm font-semibold text-neutral-300">
-            Made with sunshine &amp; sea salt in Durban. *Roughly.
-          </p>
-          <Link href="/submit" className="brutal-btn bg-durbs-yellow text-black">
-            Submit Event <Plus className="h-4 w-4" />
-          </Link>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }
