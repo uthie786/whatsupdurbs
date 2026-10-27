@@ -8,7 +8,7 @@ import {
   type EventCategory,
   type NewEventInput,
 } from "@/types/event";
-import { AREA_COORDS } from "@/lib/areas";
+import { AREA_COORDS, CATEGORY_INFO, categoryLabel } from "@/lib/areas";
 import { slugify } from "@/lib/filters";
 import { fromSastLocalInput, toSastLocalInput } from "@/lib/time";
 import type { DurbsEvent } from "@/types/event";
@@ -156,10 +156,17 @@ export default function EventFormFields({
       </Field>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Category" required flagged={f("category")}>
+        <Field
+          label="Category"
+          required
+          flagged={f("category")}
+          hint={`Covers ${CATEGORY_INFO[form.category]?.covers ?? "other events"}.`}
+        >
           <select value={form.category} onChange={set("category")} className="brutal-input">
             {EVENT_CATEGORIES.map((c) => (
-              <option key={c}>{c}</option>
+              <option key={c} value={c}>
+                {categoryLabel(c)}
+              </option>
             ))}
           </select>
         </Field>

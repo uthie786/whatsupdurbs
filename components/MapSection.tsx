@@ -36,7 +36,7 @@ export default function MapSection({
           <span className="bg-durbs-cyan px-2">Map</span> the vibe
         </h2>
         <ul className="flex flex-wrap gap-2" aria-label="Map legend">
-          {EVENT_CATEGORIES.map((c) => (
+          {EVENT_CATEGORIES.filter((c) => events.some((e) => e.category === c)).map((c) => (
             <li
               key={c}
               className="brutal-badge bg-white"

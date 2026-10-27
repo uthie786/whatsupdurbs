@@ -134,13 +134,29 @@ function isFestiveDate(value: string): boolean {
   return m === 11 || (m === 0 && d.getUTCDate() <= 15);
 }
 
+// Most specific first: a "car show" is Cars, not Concerts ("show"); a "food market" is Food, not Markets.
+const CATEGORY_RULES: [EventCategory, RegExp][] = [
+  ["Festive", /christmas|festive|new year|xmas|carol|santa/],
+  ["Cars", /\bcars?\b|car meet|car show|motor|spinn?ing|\bspin\b|drift|auto ?show|show (and|&|n) shine|petrolhead|track day|rally|supercar|bikers?\b/],
+  ["Fitness", /parkrun|park run|fun ?run|\brun\b|marathon|\b\d+ ?k(m)? (run|walk)|race|triathlon|tinman|cycl|\bride\b|yoga|pilates|bootcamp|fitness|crossfit|swim|sport/],
+  ["Outdoors", /hike|hiking|trail|outdoor|adventure|paintball|camping|kayak|surf|beach clean|nature|travel/],
+  ["Family", /\bkids?\b|children|family|toddler|school holiday/],
+  ["Social", /meet-?up|mixer|singles|speed dating|social club|book club|board games?|games night|quiz night|trivia|get-?together/],
+  ["Workshops", /workshop|class(es)?\b|course|masterclass|seminar|conference|talk\b|networking|summit|training|business/],
+  ["Theatre", /comedy|comedian|stand-?up|theatre|theater|musical|\bplay\b|ballet|dance show|poetry|cinderella|panto|improv/],
+  ["Arts", /exhibition|gallery|\bart\b|arts|film|cinema|screening|museum|culture/],
+  ["Food", /food|wine|beer|gin|whisky|brunch|braai|tasting|culinary|dining|cook/],
+  ["Markets", /market|expo|fair|craft|flea|bazaar/],
+  ["Nightlife", /party|club|nightlife|\bdj\b|rave|amapiano|gqom|lounge/],
+  ["Concerts", /music|concert|festival|live|gig|tour|choir|gospel|jazz|orchestra|worship/],
+];
+
 export function mapCategory(e: QuicketEvent): EventCategory {
   const cats = (e.categories ?? []).map((c) => c.name).join(" ");
   const text = `${e.name} ${cats}`.toLowerCase();
-  if (/christmas|festive|new year|xmas|carol|santa/.test(text)) return "Festive";
-  if (/market|expo|fair|food|craft|flea|bazaar/.test(text)) return "Markets";
-  if (/party|club|nightlife|\bdj\b|rave|amapiano|gqom|lounge/.test(text)) return "Nightlife";
-  if (/music|concert|festival|live|gig|tour|choir|gospel|jazz|orchestra/.test(text)) return "Concerts";
+  for (const [category, pattern] of CATEGORY_RULES) {
+    if (pattern.test(text)) return category;
+  }
   if (isFestiveDate(e.startDate)) return "Festive";
   return "Popups";
 }

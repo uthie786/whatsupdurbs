@@ -7,7 +7,7 @@ create table if not exists public.events (
   title        text not null,
   slug         text not null,
   description  text not null default '',
-  category     text not null check (category in ('Markets','Concerts','Popups','Nightlife','Festive')),
+  category     text not null,
   venue_name   text not null,
   address      text not null default '',
   area         text not null check (area in ('Umhlanga','Morningside','Durban North','Ballito','Central Beachfront','Point Waterfront')),
@@ -33,6 +33,12 @@ alter table public.events
 
 -- Migration for admin "Deny": denied rows are purged 24h later.
 alter table public.events add column if not exists denied_at timestamptz;
+
+-- Allowed categories (keep in sync with EVENT_CATEGORIES in types/event.ts).
+alter table public.events drop constraint if exists events_category_check;
+alter table public.events add constraint events_category_check check (category in
+  ('Markets','Concerts','Nightlife','Festive','Popups','Fitness','Outdoors','Cars',
+   'Food','Theatre','Arts','Family','Social','Workshops'));
 
 create index if not exists events_approved_start_idx on public.events (is_approved, start_date);
 

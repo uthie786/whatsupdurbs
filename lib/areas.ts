@@ -32,15 +32,57 @@ export function areaMatches(filter: AreaFilter, area: DurbanArea): boolean {
 export const CATEGORY_COLORS: Record<EventCategory, string> = {
   Markets: "#FFE600",
   Concerts: "#FF2E93",
-  Popups: "#00F0FF",
   Nightlife: "#8A2BE2",
   Festive: "#22C55E",
+  Popups: "#00F0FF",
+  Fitness: "#FF8A00",
+  Outdoors: "#A3E635",
+  Cars: "#FF3B30",
+  Food: "#FFB020",
+  Theatre: "#3B82F6",
+  Arts: "#F472B6",
+  Family: "#14B8A6",
+  Social: "#C084FC",
+  Workshops: "#94A3B8",
 };
 
+/** Badge background + readable text colour per category. */
 export const CATEGORY_BG: Record<EventCategory, string> = {
   Markets: "bg-durbs-yellow text-black",
   Concerts: "bg-durbs-pink text-white",
-  Popups: "bg-durbs-cyan text-black",
   Nightlife: "bg-durbs-purple text-white",
   Festive: "bg-green-500 text-black",
+  Popups: "bg-durbs-cyan text-black",
+  Fitness: "bg-[#FF8A00] text-black",
+  Outdoors: "bg-[#A3E635] text-black",
+  Cars: "bg-[#FF3B30] text-white",
+  Food: "bg-[#FFB020] text-black",
+  Theatre: "bg-[#3B82F6] text-white",
+  Arts: "bg-[#F472B6] text-black",
+  Family: "bg-[#14B8A6] text-black",
+  Social: "bg-[#C084FC] text-black",
+  Workshops: "bg-[#94A3B8] text-black",
 };
+
+/** Emoji for chips/menus and what each category covers (also guides the poster AI). */
+export const CATEGORY_INFO: Record<EventCategory, { emoji: string; covers: string }> = {
+  Markets: { emoji: "🛍️", covers: "markets, expos, fairs, flea and craft markets" },
+  Concerts: { emoji: "🎤", covers: "live music, gigs, gospel, choirs and orchestras" },
+  Nightlife: { emoji: "🪩", covers: "parties, clubs, DJ nights, amapiano and gqom" },
+  Festive: { emoji: "🎄", covers: "Christmas, New Year and December holiday events" },
+  Popups: { emoji: "⚡", covers: "one-off pop-ups, launches and anything that fits nowhere else" },
+  Fitness: { emoji: "🏃", covers: "park runs, fun runs, races, marathons, cycling, yoga and bootcamps" },
+  Outdoors: { emoji: "🌿", covers: "hikes, trail days, beach clean-ups, paintball and adventure activities" },
+  Cars: { emoji: "🚗", covers: "car meets, car shows, spinning and drift days, motorsport and bike rallies" },
+  Food: { emoji: "🍔", covers: "food and wine festivals, braais, tastings and brunches" },
+  Theatre: { emoji: "🎭", covers: "comedy, plays, musicals, dance shows and poetry" },
+  Arts: { emoji: "🎨", covers: "exhibitions, galleries, film screenings and culture" },
+  Family: { emoji: "👨‍👩‍👧", covers: "kids' days, family fun and school holiday activities" },
+  Social: { emoji: "🤝", covers: "social meetups, singles mixers, book and board-game clubs, community get-togethers" },
+  Workshops: { emoji: "🛠️", covers: "classes, courses, talks and business networking" },
+};
+
+/** "🏃 Fitness" */
+export function categoryLabel(category: EventCategory): string {
+  return `${CATEGORY_INFO[category].emoji} ${category}`;
+}

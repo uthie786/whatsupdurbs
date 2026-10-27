@@ -55,10 +55,17 @@ create table if not exists public.api_usage (
 create index if not exists api_usage_lookup on public.api_usage (kind, ip, created_at);
 alter table public.api_usage enable row level security;
 
+alter table public.events drop constraint if exists events_category_check;
+alter table public.events add constraint events_category_check check (category in
+  ('Markets','Concerts','Nightlife','Festive','Popups','Fitness','Outdoors','Cars',
+   'Food','Theatre','Arts','Family','Social','Workshops'));
+
 notify pgrst, 'reload schema';
 ```
 
 ## Visitor features
+
+- **Categories:** Markets, Concerts, Nightlife, Festive, Popups, Fitness, Outdoors, Cars, Food, Theatre, Arts, Family, Social, Workshops. They're defined in `types/event.ts` with colours, emoji and descriptions in `lib/areas.ts`; the descriptions also guide the poster AI. Adding one also needs the `events_category_check` constraint updated.
 
 - **Event pages** at `/events/<slug>`: poster, details, map with directions, Get Tickets, WhatsApp / native share / copy link, add to calendar and save. Link previews (WhatsApp, Facebook, X) show the poster, and schema.org `Event` data helps Google list events. Pages refresh from the database at most every 5 minutes.
 - **Add to calendar**: Google Calendar link or an `.ics` file for Apple Calendar / Outlook (all-day when the time is TBC).

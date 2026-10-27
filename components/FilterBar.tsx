@@ -3,7 +3,7 @@
 import { Heart, RotateCcw } from "lucide-react";
 import type { AreaFilter, CategoryFilter, DateFilter } from "@/types/event";
 import { EVENT_CATEGORIES } from "@/types/event";
-import { AREA_FILTERS } from "@/lib/areas";
+import { AREA_FILTERS, categoryLabel } from "@/lib/areas";
 import type { DateRange } from "@/lib/filters";
 import DateRangePicker from "./DateRangePicker";
 import NearMeButton from "./NearMeButton";
@@ -34,25 +34,36 @@ function ChipRow<T extends string>({
   options,
   value,
   onChange,
+  renderOption = (o) => o,
+  scrollOnMobile = false,
 }: {
   label: string;
   options: readonly T[];
   value: T;
   onChange: (v: T) => void;
+  renderOption?: (o: T) => string;
+  /** Long rows scroll sideways on small screens instead of wrapping into many lines. */
+  scrollOnMobile?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
       <span className="w-24 shrink-0 font-display text-sm uppercase">{label}</span>
-      <div className="flex flex-wrap gap-2" role="group" aria-label={`${label} filter`}>
+      <div
+        className={`flex gap-2 ${
+          scrollOnMobile ? "-mx-1 overflow-x-auto px-1 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" : "flex-wrap"
+        }`}
+        role="group"
+        aria-label={`${label} filter`}
+      >
         {options.map((o) => (
           <button
             key={o}
             type="button"
             aria-pressed={value === o}
             onClick={() => onChange(o)}
-            className="brutal-chip"
+            className="brutal-chip shrink-0 whitespace-nowrap"
           >
-            {o}
+            {renderOption(o)}
           </button>
         ))}
       </div>
@@ -68,6 +79,8 @@ export default function FilterBar(props: FilterBarProps) {
         options={CATEGORY_FILTERS}
         value={props.category}
         onChange={props.onCategoryChange}
+        renderOption={(c) => (c === "All" ? "All" : categoryLabel(c))}
+        scrollOnMobile
       />
       <ChipRow label="When" options={DATE_FILTERS} value={props.date} onChange={props.onDateChange} />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
