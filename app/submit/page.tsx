@@ -11,10 +11,12 @@ import EventFormFields, {
   type EventFormState,
 } from "@/components/EventForm";
 import PosterDropZone from "@/components/PosterDropZone";
+import FeatureRequestButton from "@/components/FeatureRequestButton";
 import { isSupabaseConfigured, submitEvent, uploadPoster } from "@/lib/supabase";
 import { errorMessage } from "@/lib/errors";
 import { blobToBase64 } from "@/lib/images";
 import { usePosterReader } from "@/lib/usePosterReader";
+import { FEATURE_FEE } from "@/lib/site";
 
 /** Store the organiser's poster (rate-limited server upload) and return its URL. */
 async function uploadSubmissionPoster(blob: Blob): Promise<string> {
@@ -34,6 +36,7 @@ export default function SubmitPage() {
   const [flagged, setFlagged] = useState<Set<EventFormKey>>(new Set());
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<{ title: string; venue: string } | null>(null);
   const poster = usePosterReader();
   const { read } = poster;
 
@@ -75,6 +78,7 @@ export default function SubmitPage() {
       const input = { ...built.input };
       if (poster.blob) input.image_url = await uploadSubmissionPoster(poster.blob);
       await submitEvent(input);
+      setSubmitted({ title: input.title, venue: input.venue_name });
       setStatus("done");
       setForm(EMPTY_EVENT_FORM);
       setFlagged(new Set());
@@ -98,6 +102,9 @@ export default function SubmitPage() {
             Free to list. Every submission is reviewed by our team before it goes live — usually
             within 24 hours.
           </p>
+          <p className="text-sm font-bold">
+            Want top spot? Featuring costs {FEATURE_FEE}. You can request it after you submit.
+          </p>
           {!isSupabaseConfigured && (
             <p className="border-3 border-black bg-durbs-purple px-3 py-2 text-sm font-bold text-white shadow-brutal">
               Demo mode: submissions are kept in memory for this session only (visit /admin to see
@@ -113,6 +120,12 @@ export default function SubmitPage() {
             <p className="font-semibold">
               Your event is in the moderation queue. Once approved it&apos;ll show up on the map.
             </p>
+            {submitted && (
+              <div className="mx-auto max-w-sm space-y-2 border-3 border-black bg-white p-4 text-left">
+                <p className="font-display text-sm uppercase">Want it featured?</p>
+                <FeatureRequestButton title={submitted.title} venue={submitted.venue} />
+              </div>
+            )}
             <div className="flex flex-wrap justify-center gap-3">
               <button type="button" onClick={() => setStatus("idle")} className="brutal-btn bg-white">
                 Submit another

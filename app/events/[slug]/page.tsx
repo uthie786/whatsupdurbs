@@ -9,6 +9,7 @@ import EventMap from "@/components/EventMap";
 import SaveButton from "@/components/SaveButton";
 import AddToCalendar from "@/components/AddToCalendar";
 import ShareButtons from "@/components/ShareButtons";
+import FeatureRequestButton from "@/components/FeatureRequestButton";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
 import { getPublishedEventBySlug } from "@/lib/eventsServer";
@@ -166,6 +167,18 @@ export default async function EventPage({ params }: PageProps) {
               <p className="font-display text-sm uppercase">Tell your crew</p>
               <ShareButtons event={event} />
             </div>
+
+            {!event.is_featured && !ended && (
+              <div className="space-y-2 border-3 border-dashed border-black bg-white p-4">
+                <p className="font-display text-sm uppercase">Organiser? Get this event featured</p>
+                <FeatureRequestButton
+                  title={event.title}
+                  when={formatEventDate(event)}
+                  venue={event.venue_name}
+                  url={eventUrl(event)}
+                />
+              </div>
+            )}
           </div>
         </article>
 
