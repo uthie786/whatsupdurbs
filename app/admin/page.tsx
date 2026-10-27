@@ -24,14 +24,23 @@ function hoursUntilPurge(deniedAt: string): number {
 type Tab = "pending" | "approved" | "denied";
 
 interface SyncResponse {
+  ok: boolean;
   processed: number;
   inserted: number;
   updated: number;
   failed: number;
-  nextPage: number | null;
-  pageSize?: number;
-  pages?: number;
+  since?: string;
+  notes?: string[];
+  lastSuccess?: string | null;
   error?: string;
+}
+
+function minutesAgo(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"} ago`;
 }
 
 function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
@@ -90,6 +99,8 @@ export default function AdminPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -114,35 +125,33 @@ export default function AdminPage() {
     if (authed) load();
   }, [authed, load]);
 
+  async function adminToken(): Promise<string> {
+    const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Your session expired, please sign in again.");
+    return token;
+  }
+
   async function syncQuicket() {
     if (!supabase) return;
     setSyncing(true);
     setError(null);
-    const totals = { processed: 0, inserted: 0, updated: 0, failed: 0 };
+    setSyncStatus("Syncing Quicket… this can take up to a minute (Quicket is slow).");
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("Your session expired, please sign in again.");
-      let page: number | null = 1;
-      let pageSize: number | undefined;
-      while (page) {
-        setSyncStatus(`Syncing Quicket… page ${page} · ${totals.inserted} new, ${totals.updated} updated`);
-        const qs = `mode=full&startPage=${page}${pageSize ? `&pageSize=${pageSize}` : ""}`;
-        const res: Response = await fetch(`/api/sync/quicket?${qs}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const body = (await res.json().catch(() => ({}))) as Partial<SyncResponse>;
-        totals.processed += body.processed ?? 0;
-        totals.inserted += body.inserted ?? 0;
-        totals.updated += body.updated ?? 0;
-        totals.failed += body.failed ?? 0;
-        if (!res.ok) throw new Error(body.error || `Sync failed (${res.status})`);
-        page = body.nextPage ?? null;
-        pageSize = body.pageSize ?? pageSize;
+      const res = await fetch("/api/sync/quicket", {
+        headers: { Authorization: `Bearer ${await adminToken()}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as Partial<SyncResponse>;
+      if (!res.ok || !body.ok) {
+        throw new Error(
+          (body.error || `Sync failed (${res.status})`) +
+            (body.lastSuccess ? ` · Last successful sync ${minutesAgo(body.lastSuccess)}.` : ""),
+        );
       }
       setSyncStatus(
-        `Quicket sync done: checked ${totals.processed} events · ${totals.inserted} new · ${totals.updated} updated` +
-          (totals.failed ? ` · ${totals.failed} failed` : ""),
+        `Quicket sync done: ${body.processed ?? 0} changed events checked · ${body.inserted ?? 0} new · ${body.updated ?? 0} updated` +
+          (body.failed ? ` · ${body.failed} failed` : "") +
+          (body.notes?.length ? ` · ${body.notes.join(" ")}` : ""),
       );
       await load();
     } catch (e) {
@@ -150,6 +159,29 @@ export default function AdminPage() {
       setError(e instanceof Error ? e.message : "Quicket sync failed");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function importFromQuicket(e: FormEvent) {
+    e.preventDefault();
+    if (!supabase || !importUrl.trim()) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/import/quicket", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await adminToken()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: importUrl }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { title?: string; action?: string; error?: string };
+      if (!res.ok) throw new Error(body.error || `Import failed (${res.status})`);
+      setSyncStatus(`Imported "${body.title}" from Quicket (${body.action}). It's live now.`);
+      setImportUrl("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -198,7 +230,7 @@ export default function AdminPage() {
                   ) : (
                     <CloudDownload className="h-4 w-4" />
                   )}
-                  Sync Quicket
+                  Sync Quicket now
                 </button>
               )}
               {supabase && (
@@ -218,6 +250,34 @@ export default function AdminPage() {
           <p className="border-3 border-black bg-durbs-purple px-4 py-2 text-sm font-bold text-white shadow-brutal">
             Demo mode: changes apply to in-memory sample data only.
           </p>
+        )}
+
+        {authed && supabase && (
+          <form
+            onSubmit={importFromQuicket}
+            className="flex flex-col gap-2 border-3 border-black bg-white p-3 shadow-brutal sm:flex-row sm:items-center"
+          >
+            <label htmlFor="quicket-link" className="shrink-0 font-display text-sm uppercase">
+              Import from Quicket link
+            </label>
+            <input
+              id="quicket-link"
+              type="text"
+              inputMode="url"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="https://www.quicket.co.za/events/123456-event-name/"
+              className="brutal-input flex-1 !py-1.5 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={importing || !importUrl.trim()}
+              className="brutal-btn shrink-0 bg-durbs-pink !py-1.5 text-white"
+            >
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
+              Import
+            </button>
+          </form>
         )}
 
         {syncStatus && (

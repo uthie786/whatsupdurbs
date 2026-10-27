@@ -49,66 +49,75 @@ export type QuicketEventRow = Omit<DurbsEvent, "id" | "is_featured" | "is_approv
   external_id: string;
 };
 
-export async function fetchQuicketPage(
-  page: number,
-  opts: { pageSize?: number; lastModified?: Date } = {},
-): Promise<QuicketListResult> {
-  const key = process.env.QUICKET_API_KEY;
-  if (!key) throw new Error("QUICKET_API_KEY is not set");
-  const params = new URLSearchParams({
-    api_key: key,
-    pageSize: String(opts.pageSize ?? 100),
-    page: String(page),
-  });
-  if (opts.lastModified) params.set("lastModified", opts.lastModified.toISOString());
-
-  const res = await fetch(`${QUICKET_API}/events?${params}`, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new QuicketApiError(res.status, page, opts.pageSize ?? 100, body.slice(0, 200));
-  }
-  return (await res.json()) as QuicketListResult;
-}
+/** Quicket's own server gives up after ~30s; don't wait much longer than that. */
+const REQUEST_TIMEOUT_MS = 40_000;
 
 export class QuicketApiError extends Error {
   constructor(
     readonly status: number,
-    readonly page: number,
-    readonly pageSize: number,
     body: string,
+    context: string,
   ) {
-    super(`Quicket API ${status} on page ${page} (pageSize ${pageSize}): ${body}`);
+    super(`Quicket API ${status} (${context}): ${body}`);
   }
 }
 
-/** Each size divides the previous one, so page numbers convert exactly. */
-export const QUICKET_PAGE_SIZES = [100, 50, 10] as const;
+async function quicketGet<T>(path: string, params: Record<string, string>, context: string): Promise<T> {
+  const key = process.env.QUICKET_API_KEY;
+  if (!key) throw new Error("QUICKET_API_KEY is not set");
+  const qs = new URLSearchParams({ api_key: key, ...params });
+  let res: Response;
+  try {
+    res = await fetch(`${QUICKET_API}${path}?${qs}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      throw new Error(`Quicket didn't respond within ${REQUEST_TIMEOUT_MS / 1000}s (${context})`);
+    }
+    throw err;
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new QuicketApiError(res.status, body.slice(0, 200), context);
+  }
+  return (await res.json()) as T;
+}
 
 /**
- * Fetch a page, retrying with smaller page sizes when Quicket returns a 5xx.
- * Returns the page number and size that actually worked.
+ * Events modified since `since`. Quicket's list query times out on its side
+ * for anything more than a couple of hours of changes, so keep windows small.
  */
-export async function fetchQuicketPageWithFallback(
+export function fetchQuicketPage(
   page: number,
-  pageSize: number,
-  lastModified?: Date,
-): Promise<{ result: QuicketListResult; page: number; pageSize: number }> {
-  let size = pageSize;
-  let p = page;
-  for (;;) {
-    try {
-      const result = await fetchQuicketPage(p, { pageSize: size, lastModified });
-      return { result, page: p, pageSize: size };
-    } catch (err) {
-      const smaller = QUICKET_PAGE_SIZES.find((s) => s < size);
-      if (!(err instanceof QuicketApiError) || err.status < 500 || !smaller) throw err;
-      p = Math.floor(((p - 1) * size) / smaller) + 1;
-      size = smaller;
-    }
-  }
+  since: Date,
+  pageSize = 100,
+): Promise<QuicketListResult> {
+  return quicketGet<QuicketListResult>(
+    "/events",
+    { pageSize: String(pageSize), page: String(page), lastModified: quicketDateParam(since) },
+    `events modified since ${quicketDateParam(since)}, page ${page}`,
+  );
+}
+
+/** Quicket documents the `lastModified` format as `yyyy-MM-ddTHH:mm:ss.zzZ`. */
+export function quicketDateParam(d: Date): string {
+  return `${d.toISOString().slice(0, 19)}.00Z`;
+}
+
+/** A single event by ID (fast; returns the bare event object). */
+export function fetchQuicketEvent(id: number): Promise<QuicketEvent> {
+  return quicketGet<QuicketEvent>(`/events/${id}`, {}, `event ${id}`);
+}
+
+/** Accepts a Quicket event URL (…/events/405394-name/) or a bare numeric ID. */
+export function parseQuicketEventId(input: string): number | null {
+  const trimmed = input.trim();
+  const match = /\/events\/(\d+)/i.exec(trimmed) ?? /^(\d+)$/.exec(trimmed);
+  const id = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 /* ------------------------------ Mapping ------------------------------ */
@@ -197,6 +206,14 @@ export function parseQuicketDate(value: string | null | undefined): Date | null 
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** Quicket image URLs are protocol-relative (`//images.quicket.co.za/…`). */
+export function normalizeImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("http://")) return `https://${url.slice(7)}`;
+  return url;
+}
+
 function toNumber(v: number | string | null | undefined): number | null {
   const n = typeof v === "string" ? parseFloat(v) : v;
   return typeof n === "number" && Number.isFinite(n) && n !== 0 ? n : null;
@@ -236,7 +253,7 @@ export function mapQuicketEvent(
       longitude: lng,
       start_date: start.toISOString(),
       end_date: end && end > start ? end.toISOString() : null,
-      image_url: e.imageUrl || null,
+      image_url: normalizeImageUrl(e.imageUrl),
       ticket_url: e.url || null,
       price_text: priceText(e.tickets),
       source: "quicket",
