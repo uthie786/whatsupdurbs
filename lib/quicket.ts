@@ -107,19 +107,6 @@ export function quicketDateParam(d: Date): string {
   return `${d.toISOString().slice(0, 19)}.00Z`;
 }
 
-/** A single event by ID (fast; returns the bare event object). */
-export function fetchQuicketEvent(id: number): Promise<QuicketEvent> {
-  return quicketGet<QuicketEvent>(`/events/${id}`, {}, `event ${id}`);
-}
-
-/** Accepts a Quicket event URL (…/events/405394-name/) or a bare numeric ID. */
-export function parseQuicketEventId(input: string): number | null {
-  const trimmed = input.trim();
-  const match = /\/events\/(\d+)/i.exec(trimmed) ?? /^(\d+)$/.exec(trimmed);
-  const id = match ? Number(match[1]) : NaN;
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
-}
-
 /* ------------------------------ Mapping ------------------------------ */
 
 function toRad(deg: number) {

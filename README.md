@@ -29,11 +29,32 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
 
+## Updating an existing database
+
+If the site shows an error like `Could not find the 'source' column of 'events'`, your table predates newer features. This block is safe to run any number of times:
+
+```sql
+alter table public.events
+  add column if not exists source text not null default 'manual',
+  add column if not exists external_id text unique,
+  add column if not exists denied_at timestamptz;
+
+drop policy if exists "Anyone can submit an event" on public.events;
+drop policy if exists "Public submit pending events" on public.events;
+create policy "Public submit pending events"
+  on public.events for insert
+  with check (is_approved = false and is_featured = false
+              and source = 'manual' and external_id is null
+              and denied_at is null);
+
+notify pgrst, 'reload schema';
+```
+
 ## Quicket sync
 
 Public Quicket events within ~45 km of Durban are imported into `events` (published, with "Get Tickets" linking to the Quicket page).
 
-**How it works:** Quicket's "list events" API times out on its own server for anything bigger than about two hours of changes, and the API key has a low request quota. So the sync is *incremental*: every hour it asks for events modified since the last successful run (with a 10-minute overlap) and stores the cursor in `sync_state`. If it falls more than 2 hours behind, it skips ahead and notes the gap. A full historical import isn't possible through Quicket's API, so events that already existed before the first sync appear once their organiser edits them. Use **Import from Quicket link** on `/admin` for those (one API request per event).
+**How it works:** Quicket's "list events" API times out on its own server for anything bigger than about two hours of changes, and the API key has a low request quota. So the sync is *incremental*: every hour it asks for events modified since the last successful run (with a 10-minute overlap) and stores the cursor in `sync_state`. If it falls more than 2 hours behind, it skips ahead and notes the gap. A full historical import isn't possible through Quicket's API, so events that already existed before the first sync appear once their organiser edits them. Add those with **Add event from poster** instead.
 
 Setup:
 - Set these **server-only** env vars in Vercel (no `NEXT_PUBLIC_` prefix): `QUICKET_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`.
@@ -50,7 +71,7 @@ Past events are hidden from the public site automatically (nothing is deleted).
 On `/admin`, **Add event from poster** takes one poster image (drop, paste or choose). Google's Gemini reads the title, dates, venue, area, price and ticket link into a form; you check the highlighted fields and click **Publish**. The poster (resized to 1600px) is stored in the public Supabase Storage bucket `posters` and becomes the event image.
 
 Setup:
-- Create a free API key at [aistudio.google.com](https://aistudio.google.com) and add it in Vercel as `GEMINI_API_KEY` (server-only). Optionally set `GEMINI_MODEL` (defaults to `gemini-flash-latest`).
+- Create a free API key at [aistudio.google.com](https://aistudio.google.com) and add it in Vercel as `GEMINI_API_KEY` (server-only). Optionally set `GEMINI_MODEL` (default `gemini-flash-latest`) and `GEMINI_FALLBACK_MODEL` (default `gemini-flash-lite-latest`, used when the main model is overloaded or out of free quota).
 - Run the "Poster imports" block at the end of `supabase/schema.sql` (storage bucket, upload policies, admin insert policy).
 - The free tier has request limits and Google may use free-tier inputs to improve its products. If reading fails, the form still opens with the poster attached so you can type the details in.
 
@@ -60,7 +81,7 @@ Setup:
 |-----------|--------------|
 | `/`       | Hero, featured carousel, interactive Durban map, filters (category / date / area / search) and event grid |
 | `/submit` | Organiser submission form → inserted with `is_approved: false` |
-| `/admin`  | Moderation queue: 1-click approve, deny, feature/unfeature, unpublish; Quicket sync |
+| `/admin`  | Moderation queue: 1-click approve, deny, feature/unfeature, unpublish; add events from posters; Quicket sync |
 
 ### Denying submissions
 

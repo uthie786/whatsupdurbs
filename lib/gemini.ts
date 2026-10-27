@@ -4,7 +4,11 @@ import { DURBAN_AREAS, EVENT_CATEGORIES, type DurbanArea, type EventCategory } f
 
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-flash-latest";
-const REQUEST_TIMEOUT_MS = 45_000;
+/** Used when the main model is overloaded, missing or out of free quota. */
+const DEFAULT_FALLBACK_MODEL = "gemini-flash-lite-latest";
+/** Whole extraction, retries included, must finish inside the route's 60s limit. */
+const TOTAL_BUDGET_MS = 50_000;
+const MAX_ATTEMPT_MS = 30_000;
 
 export interface PosterFields {
   title: string | null;
@@ -30,6 +34,10 @@ export class GeminiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** Worth trying again (same or another model): overload, timeouts, server errors. */
+    readonly retryable = false,
+    /** Worth switching models: the model is missing or its free quota is used up. */
+    readonly tryOtherModel = false,
   ) {
     super(message);
   }
@@ -129,26 +137,27 @@ function todayInDurban(now = new Date()): string {
   }).format(now);
 }
 
-export async function extractPosterDetails(
+type RawGeminiResponse = {
+  error?: { message?: string; status?: string };
+  candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+  promptFeedback?: { blockReason?: string };
+} | null;
+
+/** One request to one model. Throws GeminiError describing whether to retry. */
+async function callModel(
+  model: string,
+  key: string,
   imageBase64: string,
   mimeType: string,
+  timeoutMs: number,
 ): Promise<PosterExtraction> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    throw new GeminiError(
-      "GEMINI_API_KEY isn't set. Create a free key at aistudio.google.com and add it in Vercel → Settings → Environment Variables, then redeploy.",
-      500,
-    );
-  }
-  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
-
   let res: Response;
   try {
     res = await fetch(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       cache: "no-store",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         contents: [
           {
@@ -168,29 +177,24 @@ export async function extractPosterDetails(
     });
   } catch (err) {
     if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
-      throw new GeminiError("The AI took too long to read the poster. Try again.", 504);
+      throw new GeminiError(`${model} took too long to answer.`, 504, true);
     }
-    throw err;
+    throw new GeminiError(`Couldn't reach Gemini: ${err instanceof Error ? err.message : String(err)}`, 502, true);
   }
 
-  const body = (await res.json().catch(() => null)) as {
-    error?: { message?: string; status?: string };
-    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
-    promptFeedback?: { blockReason?: string };
-  } | null;
-
+  const body = (await res.json().catch(() => null)) as RawGeminiResponse;
   if (!res.ok) {
     const detail = body?.error?.message ?? `HTTP ${res.status}`;
     if (res.status === 429) {
-      throw new GeminiError(`Gemini's free-tier limit was reached. Wait a minute and try again. (${detail})`, 429);
+      throw new GeminiError(`${model}: free-tier limit reached (${detail})`, 429, false, true);
     }
     if (res.status === 404) {
-      throw new GeminiError(`Gemini model "${model}" wasn't found. Set GEMINI_MODEL to a current Flash model. (${detail})`, 502);
+      throw new GeminiError(`${model} isn't available (${detail})`, 502, false, true);
     }
-    if (res.status === 400 || res.status === 403) {
-      throw new GeminiError(`Gemini rejected the request: ${detail}`, 502);
+    if (res.status >= 500) {
+      throw new GeminiError(`${model} is overloaded (${detail})`, 503, true);
     }
-    throw new GeminiError(`Gemini error: ${detail}`, 502);
+    throw new GeminiError(`Gemini rejected the request: ${detail}`, 502);
   }
 
   if (body?.promptFeedback?.blockReason) {
@@ -201,7 +205,72 @@ export async function extractPosterDetails(
   try {
     json = JSON.parse(text);
   } catch {
-    throw new GeminiError("The AI's answer couldn't be read. Try again, or fill the form in by hand.", 502);
+    throw new GeminiError(`${model} returned an unreadable answer.`, 502, true);
   }
   return { ...parsePosterJson(json), model };
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Read a poster, retrying overloaded models and falling back to a lighter
+ * model, all within a fixed time budget.
+ */
+export async function extractPosterDetails(
+  imageBase64: string,
+  mimeType: string,
+  now: () => number = Date.now,
+): Promise<PosterExtraction> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new GeminiError(
+      "GEMINI_API_KEY isn't set. Create a free key at aistudio.google.com and add it in Vercel → Settings → Environment Variables, then redeploy.",
+      500,
+    );
+  }
+  const primary = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  const fallback = process.env.GEMINI_FALLBACK_MODEL?.trim() || DEFAULT_FALLBACK_MODEL;
+  // Primary twice (overload is usually brief), then the fallback model twice.
+  const plan: { model: string; waitMs: number }[] = [
+    { model: primary, waitMs: 0 },
+    { model: primary, waitMs: 2_000 },
+    ...(fallback !== primary
+      ? [
+          { model: fallback, waitMs: 0 },
+          { model: fallback, waitMs: 3_000 },
+        ]
+      : []),
+  ];
+
+  const deadline = now() + TOTAL_BUDGET_MS;
+  const failures: string[] = [];
+  const skipModels = new Set<string>();
+  let lastError: GeminiError | null = null;
+
+  for (const step of plan) {
+    if (skipModels.has(step.model)) continue;
+    if (step.waitMs && lastError) {
+      if (deadline - now() < step.waitMs + 5_000) break;
+      await sleep(step.waitMs);
+    }
+    const remaining = deadline - now();
+    if (remaining < 5_000) break;
+    try {
+      return await callModel(step.model, key, imageBase64, mimeType, Math.min(MAX_ATTEMPT_MS, remaining - 1_000));
+    } catch (err) {
+      if (!(err instanceof GeminiError)) throw err;
+      lastError = err;
+      failures.push(err.message);
+      if (err.tryOtherModel) skipModels.add(step.model);
+      else if (!err.retryable) throw err;
+    }
+  }
+
+  const allQuota = failures.length > 0 && lastError?.status === 429;
+  throw new GeminiError(
+    (allQuota
+      ? "Gemini's free-tier limit was reached. Wait a minute and try again."
+      : "Gemini is busy right now. Wait a minute and try again.") + ` (${failures.join("; ")})`,
+    allQuota ? 429 : 503,
+  );
 }

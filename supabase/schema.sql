@@ -126,3 +126,6 @@ create policy "Admins delete posters"
   on storage.objects for delete
   to authenticated
   using (bucket_id = 'posters');
+
+-- Make PostgREST pick up new columns immediately.
+notify pgrst, 'reload schema';
