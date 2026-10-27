@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 
-export const CONTACT_EMAIL = "uthmaan.essack@gmail.com";
+export { CONTACT_EMAIL } from "@/lib/site";
 
 /** Shared layout for the privacy policy and data-deletion pages. */
 export default function LegalPage({ title, updated, children }: { title: string; updated: string; children: ReactNode }) {

@@ -107,6 +107,10 @@ Organisers can upload a poster on `/submit`; Gemini pre-fills the form and the p
 
 `/admin` flags events that look like the same event (similar title on an overlapping day), including in the poster review before publishing. **Edit** changes any field or the poster without changing the event's link; edited Quicket events are no longer overwritten by the sync.
 
+### Featured events
+
+Organisers can request featuring (currently R350, `FEATURE_FEE` in `lib/site.ts`) from an event page or after submitting on `/submit`. The **Get featured** button opens their email app with a pre-filled request to `CONTACT_EMAIL` (whatsupdurbz@gmail.com); reply with payment details, then switch on ★ Feature in `/admin` once paid.
+
 ## Pages
 
 | Route     | What it does |
