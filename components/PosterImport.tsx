@@ -78,6 +78,7 @@ export default function PosterImport({ onPublished }: { onPublished: () => void 
   const [form, setForm] = useState<EventFormState>(EMPTY_EVENT_FORM);
   const [flagged, setFlagged] = useState<Set<EventFormKey>>(new Set());
   const [notes, setNotes] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -94,6 +95,7 @@ export default function PosterImport({ onPublished }: { onPublished: () => void 
     setForm(EMPTY_EVENT_FORM);
     setFlagged(new Set());
     setNotes(null);
+    setModel(null);
     setError(null);
   };
 
@@ -127,12 +129,18 @@ export default function PosterImport({ onPublished }: { onPublished: () => void 
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ imageBase64: await blobToBase64(resized), mimeType: "image/jpeg" }),
       });
-      const body = (await res.json().catch(() => ({}))) as { fields?: PosterFields; notes?: string | null; error?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        fields?: PosterFields;
+        notes?: string | null;
+        model?: string;
+        error?: string;
+      };
       if (!res.ok || !body.fields) throw new Error(body.error || `Reading the poster failed (${res.status}).`);
       const filled = formFromFields(body.fields);
       setForm(filled.form);
       setFlagged(filled.flagged);
       setNotes(body.notes ?? null);
+      setModel(body.model ?? null);
     } catch (err) {
       // Still let the admin enter the details by hand, with the poster attached.
       setError(`${errorMessage(err)} You can still fill in the details below.`);
@@ -255,6 +263,9 @@ export default function PosterImport({ onPublished }: { onPublished: () => void 
             <p className="text-xs font-semibold text-neutral-600">This poster becomes the event image.</p>
           </div>
           <div className="space-y-4">
+            {model && (
+              <p className="text-xs font-bold text-neutral-600">Read by {model}. Check every field before publishing.</p>
+            )}
             {notes && (
               <p className="border-3 border-black bg-durbs-yellow px-3 py-2 text-sm font-bold">AI note: {notes}</p>
             )}

@@ -12,6 +12,10 @@ export function errorMessage(err: unknown, fallback = "Something went wrong"): s
     if (typeof e.message === "string" && e.message) {
       const extra = [e.details, e.hint].filter((x): x is string => typeof x === "string" && x.length > 0);
       const code = typeof e.code === "string" && e.code ? ` [${e.code}]` : "";
+      const missingColumn = e.code === "PGRST204" || e.code === "42703" || e.code === "PGRST205";
+      if (missingColumn) {
+        extra.push("The database is missing a recent update. Run the latest SQL from the README in the Supabase SQL Editor.");
+      }
       return [e.message + code, ...extra].join(" — ");
     }
     try {

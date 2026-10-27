@@ -101,8 +101,6 @@ export default function AdminPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
-  const [importUrl, setImportUrl] = useState("");
-  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -161,29 +159,6 @@ export default function AdminPage() {
       setError(errorMessage(e, "Quicket sync failed"));
     } finally {
       setSyncing(false);
-    }
-  }
-
-  async function importFromQuicket(e: FormEvent) {
-    e.preventDefault();
-    if (!supabase || !importUrl.trim()) return;
-    setImporting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/import/quicket", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${await adminToken()}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ url: importUrl }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { title?: string; action?: string; error?: string };
-      if (!res.ok) throw new Error(body.error || `Import failed (${res.status})`);
-      setSyncStatus(`Imported "${body.title}" from Quicket (${body.action}). It's live now.`);
-      setImportUrl("");
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, "Import failed"));
-    } finally {
-      setImporting(false);
     }
   }
 
@@ -255,34 +230,6 @@ export default function AdminPage() {
         )}
 
         {authed && <PosterImport onPublished={load} />}
-
-        {authed && supabase && (
-          <form
-            onSubmit={importFromQuicket}
-            className="flex flex-col gap-2 border-3 border-black bg-white p-3 shadow-brutal sm:flex-row sm:items-center"
-          >
-            <label htmlFor="quicket-link" className="shrink-0 font-display text-sm uppercase">
-              Import from Quicket link
-            </label>
-            <input
-              id="quicket-link"
-              type="text"
-              inputMode="url"
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-              placeholder="https://www.quicket.co.za/events/123456-event-name/"
-              className="brutal-input flex-1 !py-1.5 text-sm"
-            />
-            <button
-              type="submit"
-              disabled={importing || !importUrl.trim()}
-              className="brutal-btn shrink-0 bg-durbs-pink !py-1.5 text-white"
-            >
-              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
-              Import
-            </button>
-          </form>
-        )}
 
         {syncStatus && (
           <p className="border-3 border-black bg-durbs-cyan px-4 py-2 text-sm font-bold shadow-brutal">
