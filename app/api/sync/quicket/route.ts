@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAdminRequest, isCronRequest } from "@/lib/adminAuth";
-import { fetchQuicketPage, mapQuicketEvent, type QuicketEventRow, type SkipReason } from "@/lib/quicket";
+import {
+  QuicketApiError,
+  fetchQuicketPage,
+  mapQuicketEvent,
+  type QuicketEventRow,
+  type SkipReason,
+} from "@/lib/quicket";
 import {
   computeSyncWindow,
   purgeDeniedEvents,
@@ -9,6 +15,7 @@ import {
   writeSyncState,
 } from "@/lib/quicketSync";
 import { errorMessage } from "@/lib/errors";
+import { purgeOldUsage } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -49,6 +56,7 @@ export async function GET(req: NextRequest) {
     }
     const window = computeSyncWindow(state.last_success ? new Date(state.last_success) : null, started);
     const purged = dryRun ? 0 : await purgeDeniedEvents();
+    if (!dryRun) await purgeOldUsage();
 
     let page = 1;
     let pages = 1;
@@ -108,10 +116,23 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     const message = errorMessage(err);
+    // Quicket's list query regularly times out on its own server; that's not our fault and
+    // the next hourly run retries, so report it as a temporary hiccup rather than a failure.
+    const transient = err instanceof QuicketApiError && err.status >= 500;
     console.error("Quicket sync failed:", message);
     if (!dryRun) await writeSyncState({ last_error: message }).catch(() => {});
     return NextResponse.json(
-      { ok: false, error: message, ...totals, skipped, lastSuccess: state.last_success },
+      {
+        ok: false,
+        transient,
+        error: transient
+          ? "Quicket's server was too slow this time; the hourly sync will try again."
+          : message,
+        detail: transient ? message : undefined,
+        ...totals,
+        skipped,
+        lastSuccess: state.last_success,
+      },
       { status: 502 },
     );
   }

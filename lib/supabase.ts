@@ -359,3 +359,20 @@ export async function publishEvent(input: NewEventInput, source = "poster"): Pro
   const { error } = await supabase.from(EVENTS_TABLE).insert(row);
   if (error) throw new Error(errorMessage(error));
 }
+
+/** Fields an admin can change when editing an event (slug stays so links keep working). */
+export type EventDetailsPatch = Partial<
+  Omit<DurbsEvent, "id" | "slug" | "is_approved" | "is_featured" | "denied_at" | "created_at" | "source" | "external_id">
+>;
+
+/** Save an admin's edits. Marks the event as edited so the Quicket sync won't overwrite it. */
+export async function updateEventDetails(id: string, patch: EventDetailsPatch): Promise<void> {
+  const row = { ...patch, edited_at: new Date().toISOString() };
+  if (!supabase) {
+    const event = getMockStore().find((e) => e.id === id);
+    if (event) Object.assign(event, row);
+    return;
+  }
+  const { error } = await supabase.from(EVENTS_TABLE).update(row).eq("id", id);
+  if (error) throw new Error(errorMessage(error));
+}

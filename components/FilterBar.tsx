@@ -1,11 +1,13 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { Heart, RotateCcw } from "lucide-react";
 import type { AreaFilter, CategoryFilter, DateFilter } from "@/types/event";
 import { EVENT_CATEGORIES } from "@/types/event";
 import { AREA_FILTERS } from "@/lib/areas";
 import type { DateRange } from "@/lib/filters";
 import DateRangePicker from "./DateRangePicker";
+import NearMeButton from "./NearMeButton";
+import type { NearMeStatus } from "@/lib/useNearMe";
 
 export const CATEGORY_FILTERS: CategoryFilter[] = ["All", ...EVENT_CATEGORIES];
 export const DATE_FILTERS: DateFilter[] = ["All", "Today", "This Weekend", "Festive Season"];
@@ -19,6 +21,11 @@ interface FilterBarProps {
   onAreaChange: (v: AreaFilter) => void;
   dateRange: DateRange;
   onDateRangeChange: (v: DateRange) => void;
+  savedOnly: boolean;
+  savedCount: number;
+  onSavedOnlyChange: (v: boolean) => void;
+  nearMeStatus: NearMeStatus;
+  onNearMeToggle: () => void;
   onReset: () => void;
 }
 
@@ -68,7 +75,18 @@ export default function FilterBar(props: FilterBarProps) {
         <DateRangePicker value={props.dateRange} onChange={props.onDateRangeChange} />
       </div>
       <ChipRow label="Area" options={AREA_FILTERS} value={props.area} onChange={props.onAreaChange} />
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={props.savedOnly}
+            onClick={() => props.onSavedOnlyChange(!props.savedOnly)}
+            className={`brutal-btn !py-1.5 !text-xs ${props.savedOnly ? "bg-durbs-pink text-white" : "bg-white"}`}
+          >
+            <Heart className={`h-4 w-4 ${props.savedOnly ? "fill-white" : ""}`} /> Saved ({props.savedCount})
+          </button>
+          <NearMeButton status={props.nearMeStatus} onToggle={props.onNearMeToggle} />
+        </div>
         <button type="button" onClick={props.onReset} className="brutal-btn bg-white !py-1 !text-xs">
           <RotateCcw className="h-3.5 w-3.5" /> Reset filters
         </button>

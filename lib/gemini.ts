@@ -143,14 +143,16 @@ type RawGeminiResponse = {
   promptFeedback?: { blockReason?: string };
 } | null;
 
-/** One request to one model. Throws GeminiError describing whether to retry. */
-async function callModel(
+type Part = { inline_data: { mime_type: string; data: string } } | { text: string };
+
+/** One request to one model, returning parsed JSON. Throws GeminiError describing whether to retry. */
+async function callGemini(
   model: string,
   key: string,
-  imageBase64: string,
-  mimeType: string,
+  parts: Part[],
+  schema: object,
   timeoutMs: number,
-): Promise<PosterExtraction> {
+): Promise<unknown> {
   let res: Response;
   try {
     res = await fetch(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent`, {
@@ -159,19 +161,11 @@ async function callModel(
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inline_data: { mime_type: mimeType, data: imageBase64 } },
-              { text: buildPrompt(todayInDurban()) },
-            ],
-          },
-        ],
+        contents: [{ role: "user", parts }],
         generationConfig: {
           temperature: 0.1,
           responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+          responseSchema: schema,
         },
       }),
     });
@@ -201,26 +195,24 @@ async function callModel(
     throw new GeminiError(`Gemini declined to read this image (${body.promptFeedback.blockReason}).`, 422);
   }
   const text = body?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  let json: unknown;
   try {
-    json = JSON.parse(text);
+    return JSON.parse(text);
   } catch {
     throw new GeminiError(`${model} returned an unreadable answer.`, 502, true);
   }
-  return { ...parsePosterJson(json), model };
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Read a poster, retrying overloaded models and falling back to a lighter
- * model, all within a fixed time budget.
+ * Run a Gemini request, retrying overloaded models and falling back to a
+ * lighter model, all within a fixed time budget.
  */
-export async function extractPosterDetails(
-  imageBase64: string,
-  mimeType: string,
+async function withModelFallback<T>(
+  request: (model: string, key: string, timeoutMs: number) => Promise<T>,
   now: () => number = Date.now,
-): Promise<PosterExtraction> {
+  budgetMs = TOTAL_BUDGET_MS,
+): Promise<T> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     throw new GeminiError(
@@ -242,7 +234,7 @@ export async function extractPosterDetails(
       : []),
   ];
 
-  const deadline = now() + TOTAL_BUDGET_MS;
+  const deadline = now() + budgetMs;
   const failures: string[] = [];
   const skipModels = new Set<string>();
   let lastError: GeminiError | null = null;
@@ -256,7 +248,7 @@ export async function extractPosterDetails(
     const remaining = deadline - now();
     if (remaining < 5_000) break;
     try {
-      return await callModel(step.model, key, imageBase64, mimeType, Math.min(MAX_ATTEMPT_MS, remaining - 1_000));
+      return await request(step.model, key, Math.min(MAX_ATTEMPT_MS, remaining - 1_000));
     } catch (err) {
       if (!(err instanceof GeminiError)) throw err;
       lastError = err;
@@ -272,5 +264,77 @@ export async function extractPosterDetails(
       ? "Gemini's free-tier limit was reached. Wait a minute and try again."
       : "Gemini is busy right now. Wait a minute and try again.") + ` (${failures.join("; ")})`,
     allQuota ? 429 : 503,
+  );
+}
+
+/** Read the event details off one poster image. */
+export async function extractPosterDetails(
+  imageBase64: string,
+  mimeType: string,
+  now: () => number = Date.now,
+): Promise<PosterExtraction> {
+  return withModelFallback(async (model, key, timeoutMs) => {
+    const json = await callGemini(
+      model,
+      key,
+      [{ inline_data: { mime_type: mimeType, data: imageBase64 } }, { text: buildPrompt(todayInDurban()) }],
+      RESPONSE_SCHEMA,
+      timeoutMs,
+    );
+    return { ...parsePosterJson(json), model };
+  }, now);
+}
+
+/* ------------------------- Instagram posts ------------------------- */
+
+const POST_SCHEMA = {
+  ...RESPONSE_SCHEMA,
+  properties: { is_event: { type: "BOOLEAN" }, ...RESPONSE_SCHEMA.properties },
+  required: ["is_event", ...RESPONSE_SCHEMA.required],
+};
+
+function buildPostPrompt(today: string, account: string, caption: string, postedAt: string | null): string {
+  return `${buildPrompt(today)}
+
+This image comes from the Instagram account @${account}${postedAt ? `, posted ${postedAt.slice(0, 10)}` : ""}. Its caption is below; use it together with the image.
+- is_event: true only if this post promotes a specific upcoming event with a date (a poster, flyer or announcement). False for photos of past events, general promos, menus, memes, giveaways or posts with no date.
+- If is_event is false, the other fields may all be null.
+- For start_local, a weekday with no date (e.g. "this Friday") means the next one after the posting date.
+- ticket_url may come from the caption (a link or "tickets at quicket.co.za/...").
+
+Caption:
+"""
+${caption.slice(0, 2000)}
+"""`;
+}
+
+export interface PostExtraction extends PosterExtraction {
+  isEvent: boolean;
+}
+
+/** Decide whether an Instagram post is an event and, if so, read its details. */
+export async function extractEventFromPost(
+  imageBase64: string,
+  mimeType: string,
+  post: { account: string; caption: string; postedAt: string | null },
+  budgetMs = TOTAL_BUDGET_MS,
+): Promise<PostExtraction> {
+  return withModelFallback(
+    async (model, key, timeoutMs) => {
+      const json = await callGemini(
+        model,
+        key,
+        [
+          { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          { text: buildPostPrompt(todayInDurban(), post.account, post.caption, post.postedAt) },
+        ],
+        POST_SCHEMA,
+        timeoutMs,
+      );
+      const isEvent = Boolean(json && typeof json === "object" && (json as { is_event?: unknown }).is_event === true);
+      return { ...parsePosterJson(json), model, isEvent };
+    },
+    Date.now,
+    budgetMs,
   );
 }

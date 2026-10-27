@@ -1,8 +1,6 @@
 import {
   addDays,
   endOfDay,
-  format,
-  isSameDay,
   isToday,
   isWithinInterval,
   nextFriday,
@@ -16,6 +14,7 @@ import type {
   DurbsEvent,
 } from "@/types/event";
 import { areaMatches } from "@/lib/areas";
+import { isTimeUnknown, sastDayKey, sastParts } from "@/lib/time";
 
 /** True when an event overlaps the [from, to] window. */
 function overlaps(event: DurbsEvent, from: Date, to: Date): boolean {
@@ -112,18 +111,21 @@ export function filterEvents(events: DurbsEvent[], f: EventFilters): DurbsEvent[
   });
 }
 
+/** Human-readable date for an event, always in Durban time (same on server and browser). */
 export function formatEventDate(event: DurbsEvent): string {
   const start = parseISO(event.start_date);
+  const s = sastParts(start);
+  const startDay = `${s.weekday} ${s.day} ${s.month}`;
   if (!event.end_date) {
     // Imported listings without a known time are stored at midnight.
-    const timeKnown = start.getHours() !== 0 || start.getMinutes() !== 0;
-    return format(start, "EEE d MMM") + (timeKnown ? format(start, " · HH:mm") : " · Time TBC");
+    return `${startDay} · ${isTimeUnknown(start) ? "Time TBC" : `${s.hour}:${s.minute}`}`;
   }
   const end = parseISO(event.end_date);
-  if (isSameDay(start, end)) {
-    return `${format(start, "EEE d MMM · HH:mm")}–${format(end, "HH:mm")}`;
+  const e = sastParts(end);
+  if (sastDayKey(start) === sastDayKey(end)) {
+    return `${startDay} · ${s.hour}:${s.minute}–${e.hour}:${e.minute}`;
   }
-  return `${format(start, "d MMM")} – ${format(end, "d MMM yyyy")}`;
+  return `${s.day} ${s.month} – ${e.day} ${e.month} ${e.year}`;
 }
 
 export function slugify(text: string): string {

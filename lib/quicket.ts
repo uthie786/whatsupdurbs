@@ -3,6 +3,7 @@
 import type { DurbanArea, DurbsEvent, EventCategory } from "@/types/event";
 import { AREA_COORDS, DURBAN_CENTER } from "@/lib/areas";
 import { slugify } from "@/lib/filters";
+import { distanceKm } from "@/lib/geo";
 
 const QUICKET_API = "https://api.quicket.co.za/api";
 
@@ -75,7 +76,7 @@ async function quicketGet<T>(path: string, params: Record<string, string>, conte
     });
   } catch (err) {
     if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
-      throw new Error(`Quicket didn't respond within ${REQUEST_TIMEOUT_MS / 1000}s (${context})`);
+      throw new QuicketApiError(504, `no response within ${REQUEST_TIMEOUT_MS / 1000}s`, context);
     }
     throw err;
   }
@@ -108,19 +109,6 @@ export function quicketDateParam(d: Date): string {
 }
 
 /* ------------------------------ Mapping ------------------------------ */
-
-function toRad(deg: number) {
-  return (deg * Math.PI) / 180;
-}
-
-export function distanceKm(a: [number, number], b: [number, number]): number {
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.sqrt(h));
-}
 
 export function isInDurbanRegion(lat: number, lng: number): boolean {
   return distanceKm(DURBAN_CENTER, [lat, lng]) <= DURBAN_RADIUS_KM;

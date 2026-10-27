@@ -81,3 +81,24 @@
     animation: none;
   }
 }
+
+/* Long-form text on the privacy and data-deletion pages */
+.legal h2 {
+  @apply font-display text-xl uppercase;
+}
+.legal ul,
+.legal ol {
+  @apply space-y-2 pl-5 font-medium;
+}
+.legal ul {
+  @apply list-disc;
+}
+.legal ol {
+  @apply list-decimal;
+}
+.legal p {
+  @apply font-medium;
+}
+.legal a {
+  @apply font-bold text-durbs-purple underline;
+}

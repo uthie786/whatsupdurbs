@@ -127,5 +127,54 @@ create policy "Admins delete posters"
   to authenticated
   using (bucket_id = 'posters');
 
+-- Admin edits: once set, the Quicket sync stops overwriting the event.
+alter table public.events add column if not exists edited_at timestamptz;
+
+-- Rate limiting for public poster reading/uploads on /submit (service role only).
+create table if not exists public.api_usage (
+  id         bigserial primary key,
+  ip         text not null,
+  kind       text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists api_usage_lookup on public.api_usage (kind, ip, created_at);
+alter table public.api_usage enable row level security;
+
+-- Instagram: where an event was found (e.g. the post's link).
+alter table public.events add column if not exists source_url text;
+
+-- Instagram accounts to follow, and posts already checked (service role only).
+create table if not exists public.instagram_accounts (
+  username        text primary key,
+  active          boolean not null default true,
+  last_checked_at timestamptz,
+  last_error      text,
+  created_at      timestamptz not null default now()
+);
+alter table public.instagram_accounts enable row level security;
+
+create table if not exists public.instagram_posts (
+  media_id   text primary key,
+  username   text not null,
+  permalink  text,
+  posted_at  timestamptz,
+  status     text not null,
+  detail     text,
+  event_id   uuid references public.events (id) on delete set null,
+  checked_at timestamptz not null default now()
+);
+create index if not exists instagram_posts_username on public.instagram_posts (username, checked_at);
+alter table public.instagram_posts enable row level security;
+
+-- Hourly Instagram check (at :37, away from the Quicket sync). Replace the URL and secret.
+select cron.schedule(
+  'instagram-sync',
+  '37 * * * *',
+  $$select net.http_get(
+      url := 'https://YOUR-SITE.vercel.app/api/sync/instagram',
+      headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'),
+      timeout_milliseconds := 60000)$$
+);
+
 -- Make PostgREST pick up new columns immediately.
 notify pgrst, 'reload schema';

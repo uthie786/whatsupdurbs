@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarDays, MapPin, Sparkles, Ticket } from "lucide-react";
 import type { DurbsEvent } from "@/types/event";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
 import EventImage from "./EventImage";
+import SaveButton from "./SaveButton";
+import { eventPath } from "@/lib/site";
 
 const AUTO_ADVANCE_MS = 6000;
 
@@ -83,7 +86,11 @@ export default function FeaturedCarousel({ events }: { events: DurbsEvent[] }) {
           <span className={`brutal-badge self-start ${CATEGORY_BG[event.category]}`}>
             {event.category}
           </span>
-          <h3 className="font-display text-3xl uppercase leading-tight">{event.title}</h3>
+          <h3 className="font-display text-3xl uppercase leading-tight">
+            <Link href={eventPath(event)} className="hover:underline hover:decoration-4 hover:underline-offset-4">
+              {event.title}
+            </Link>
+          </h3>
           <p className="font-medium text-neutral-800">{event.description}</p>
           <ul className="space-y-1.5 text-sm font-bold">
             <li className="flex items-center gap-2">
@@ -107,6 +114,10 @@ export default function FeaturedCarousel({ events }: { events: DurbsEvent[] }) {
                 <Ticket className="h-4 w-4" /> Get Tickets
               </a>
             )}
+            <Link href={eventPath(event)} className="brutal-btn bg-white">
+              Details <ArrowRight className="h-4 w-4" />
+            </Link>
+            <SaveButton eventId={event.id} title={event.title} />
             <div className="flex gap-1.5" role="tablist" aria-label="Choose featured event">
               {events.map((e, i) => (
                 <button

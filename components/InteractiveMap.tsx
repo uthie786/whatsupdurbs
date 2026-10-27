@@ -5,15 +5,27 @@
 import L from "leaflet";
 import { useEffect } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
-import { Ticket } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Ticket } from "lucide-react";
 import type { DurbsEvent } from "@/types/event";
-import { AREA_COORDS, CATEGORY_COLORS, DURBAN_CENTER } from "@/lib/areas";
+import { CATEGORY_COLORS, DURBAN_CENTER } from "@/lib/areas";
+import { distanceKm, eventPosition, type LatLng } from "@/lib/geo";
+import { eventPath } from "@/lib/site";
 import { formatEventDate } from "@/lib/filters";
 import EventImage from "./EventImage";
 
 interface InteractiveMapProps {
   events: DurbsEvent[];
+  /** Visitor's location for "near me": shown as a marker and used to frame the map. */
+  userLocation?: LatLng | null;
 }
+
+const userIcon = L.divIcon({
+  className: "durbs-pin",
+  html: `<div style="width:22px;height:22px;background:#00F0FF;border:3px solid #000;border-radius:9999px;box-shadow:0 0 0 6px rgba(0,240,255,0.35),3px 3px 0 0 #000;"></div>`,
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+});
 
 const iconCache = new Map<string, L.DivIcon>();
 
@@ -32,17 +44,6 @@ function pinIcon(color: string, featured: boolean): L.DivIcon {
   });
   iconCache.set(key, icon);
   return icon;
-}
-
-/** Venue coordinates, falling back to the area centre when they're missing. */
-function basePosition(event: DurbsEvent): [number, number] {
-  const hasCoords =
-    Number.isFinite(event.latitude) &&
-    Number.isFinite(event.longitude) &&
-    (event.latitude !== 0 || event.longitude !== 0);
-  return hasCoords
-    ? [event.latitude, event.longitude]
-    : AREA_COORDS[event.area] ?? DURBAN_CENTER;
 }
 
 /** Spread events that share the same coordinates so every pin is clickable. */
@@ -70,10 +71,10 @@ function FitToPins({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
-export default function InteractiveMap({ events }: InteractiveMapProps) {
+export default function InteractiveMap({ events, userLocation = null }: InteractiveMapProps) {
   const seen = new Map<string, number>();
   const pins = events.map((event) => {
-    const base = basePosition(event);
+    const base = eventPosition(event);
     const spot = `${base[0].toFixed(3)},${base[1].toFixed(3)}`;
     const idx = seen.get(spot) ?? 0;
     seen.set(spot, idx + 1);
@@ -91,7 +92,27 @@ export default function InteractiveMap({ events }: InteractiveMapProps) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <FitToPins positions={pins.map((p) => p.position)} />
+      <FitToPins
+        positions={
+          userLocation
+            ? // Frame the visitor plus the closest few events.
+              [
+                userLocation,
+                ...pins
+                  .map((p) => p.position)
+                  .sort((a, b) => distanceKm(userLocation, a) - distanceKm(userLocation, b))
+                  .slice(0, 5),
+              ]
+            : pins.map((p) => p.position)
+        }
+      />
+      {userLocation && (
+        <Marker position={userLocation} icon={userIcon} zIndexOffset={1000}>
+          <Popup className="durbs-popup">
+            <p className="!m-0 p-3 font-display text-sm uppercase">You are here</p>
+          </Popup>
+        </Marker>
+      )}
       {pins.map(({ event, position }) => {
         return (
           <Marker
@@ -134,6 +155,12 @@ export default function InteractiveMap({ events }: InteractiveMapProps) {
                   ) : (
                     <span className="brutal-badge mt-1 bg-durbs-cyan">No ticket needed</span>
                   )}
+                  <Link
+                    href={eventPath(event)}
+                    className="brutal-btn mt-1 w-full bg-white !py-1.5 !text-xs !text-black"
+                  >
+                    Details <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
               </div>
             </Popup>

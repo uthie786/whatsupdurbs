@@ -40,7 +40,7 @@ export default function EventImage({ src, alt, category, className = "" }: Event
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className={`object-cover ${className}`}
+      className={`${/\bobject-(contain|cover|fill|none)\b/.test(className) ? "" : "object-cover"} ${className}`}
     />
   );
 }
