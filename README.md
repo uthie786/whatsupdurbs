@@ -45,6 +45,15 @@ Setup:
 
 Past events are hidden from the public site automatically (nothing is deleted).
 
+## Add events from posters (free AI)
+
+On `/admin`, **Add event from poster** takes one poster image (drop, paste or choose). Google's Gemini reads the title, dates, venue, area, price and ticket link into a form; you check the highlighted fields and click **Publish**. The poster (resized to 1600px) is stored in the public Supabase Storage bucket `posters` and becomes the event image.
+
+Setup:
+- Create a free API key at [aistudio.google.com](https://aistudio.google.com) and add it in Vercel as `GEMINI_API_KEY` (server-only). Optionally set `GEMINI_MODEL` (defaults to `gemini-flash-latest`).
+- Run the "Poster imports" block at the end of `supabase/schema.sql` (storage bucket, upload policies, admin insert policy).
+- The free tier has request limits and Google may use free-tier inputs to improve its products. If reading fails, the form still opens with the poster attached so you can type the details in.
+
 ## Pages
 
 | Route     | What it does |

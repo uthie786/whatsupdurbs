@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { addDays, setHours, setMinutes, startOfDay } from "date-fns";
 import type { DurbsEvent, NewEventInput } from "@/types/event";
+import { errorMessage } from "@/lib/errors";
 import { AREA_COORDS } from "@/lib/areas";
 import { weekendWindow } from "@/lib/filters";
 
@@ -277,7 +278,7 @@ export async function fetchApprovedEvents(): Promise<DurbsEvent[]> {
     .eq("is_approved", true)
     .or(`end_date.gte.${now},and(end_date.is.null,start_date.gte.${today})`)
     .order("start_date", { ascending: true });
-  if (error) throw error;
+  if (error) throw new Error(errorMessage(error));
   return (data ?? []) as DurbsEvent[];
 }
 
@@ -297,7 +298,7 @@ export async function fetchAllEventsForAdmin(): Promise<DurbsEvent[]> {
     .from(EVENTS_TABLE)
     .select("*")
     .order("created_at", { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(errorMessage(error));
   return (data ?? []) as DurbsEvent[];
 }
 
@@ -312,7 +313,7 @@ export async function submitEvent(input: NewEventInput): Promise<void> {
     return;
   }
   const { error } = await supabase.from(EVENTS_TABLE).insert(row);
-  if (error) throw error;
+  if (error) throw new Error(errorMessage(error));
 }
 
 export type EventFlagsPatch = Partial<
@@ -329,5 +330,32 @@ export async function updateEventFlags(
     return;
   }
   const { error } = await supabase.from(EVENTS_TABLE).update(patch).eq("id", id);
-  if (error) throw error;
+  if (error) throw new Error(errorMessage(error));
+}
+
+/* --------------------------- Poster imports --------------------------- */
+
+export const POSTERS_BUCKET = "posters";
+
+/** Upload a poster image and return its public URL (an object URL in demo mode). */
+export async function uploadPoster(blob: Blob): Promise<string> {
+  if (!supabase) return URL.createObjectURL(blob);
+  const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+  const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from(POSTERS_BUCKET)
+    .upload(path, blob, { contentType: blob.type || "image/jpeg", cacheControl: "31536000" });
+  if (error) throw new Error(`Uploading the poster failed: ${errorMessage(error)}`);
+  return supabase.storage.from(POSTERS_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/** Admin-created event, published straight away. */
+export async function publishEvent(input: NewEventInput, source = "poster"): Promise<void> {
+  const row = { ...input, is_approved: true, is_featured: false, source };
+  if (!supabase) {
+    getMockStore().push({ ...row, id: `mock-${Date.now()}`, created_at: new Date().toISOString() });
+    return;
+  }
+  const { error } = await supabase.from(EVENTS_TABLE).insert(row);
+  if (error) throw new Error(errorMessage(error));
 }
