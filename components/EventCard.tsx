@@ -20,65 +20,77 @@ interface EventCardProps {
 export default function EventCard({ event, distanceKm = null }: EventCardProps) {
   const href = eventPath(event);
   return (
-    <article className="group flex flex-col border-3 border-black bg-white shadow-brutal transition-all duration-150 hover:-translate-x-1 hover:-translate-y-1 hover:shadow-brutal-lg">
+    <article className="group flex min-w-0 flex-col border-3 border-black bg-white shadow-brutal transition-all duration-150 hover:-translate-x-1 hover:-translate-y-1 hover:shadow-brutal-lg">
       <div className="relative">
         <Link href={href} aria-label={event.title} tabIndex={-1}>
           <EventImage
             src={event.image_url}
             alt={event.title}
             category={event.category}
-            className="h-44 w-full border-b-3 border-black"
+            className="h-28 w-full border-b-3 border-black sm:h-44"
           />
         </Link>
-        <span className={`brutal-badge absolute left-3 top-3 ${CATEGORY_BG[event.category]}`}>
+        <span
+          className={`brutal-badge absolute left-2 top-2 !px-1.5 !text-[9px] sm:left-3 sm:top-3 sm:!px-2 sm:!text-[11px] ${CATEGORY_BG[event.category]}`}
+        >
           {event.category}
         </span>
-        <div className="absolute right-3 top-3 flex items-center gap-1.5">
+        <div className="absolute right-2 top-2 flex items-center gap-1.5 sm:right-3 sm:top-3">
           {event.is_featured && (
-            <span className="brutal-badge bg-durbs-yellow">
-              <Star className="h-3 w-3 fill-black" /> Featured
+            <span className="brutal-badge bg-durbs-yellow !px-1.5 sm:!px-2" title="Featured">
+              <Star className="h-3 w-3 fill-black" /> <span className="hidden sm:inline">Featured</span>
             </span>
           )}
           <SaveButton eventId={event.id} title={event.title} />
         </div>
         {distanceKm !== null && (
-          <span className="brutal-badge absolute bottom-3 left-3 bg-black text-white">
+          <span className="brutal-badge absolute bottom-2 left-2 bg-black !text-[9px] text-white sm:bottom-3 sm:left-3 sm:!text-[11px]">
             <Navigation className="h-3 w-3" /> {formatDistance(distanceKm)} away
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="font-display text-lg uppercase leading-tight">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-2.5 sm:gap-2 sm:p-4">
+        <h3 className="line-clamp-2 font-display text-sm uppercase leading-tight sm:text-lg">
           <Link href={href} className="hover:underline hover:decoration-4 hover:underline-offset-4">
             {event.title}
           </Link>
         </h3>
-        <p className="line-clamp-2 text-sm font-medium text-neutral-700">{event.description}</p>
-        <ul className="mt-1 space-y-1 text-xs font-bold">
-          <li className="flex items-center gap-1.5">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" /> {formatEventDate(event)}
+        <p className="hidden text-sm font-medium text-neutral-700 sm:line-clamp-2">{event.description}</p>
+        <ul className="mt-1 space-y-1 text-[11px] font-bold sm:text-xs">
+          <li className="flex min-w-0 items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{formatEventDate(event)}</span>
           </li>
-          <li className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0" /> {event.venue_name} · {event.area}
+          <li className="flex min-w-0 items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {event.venue_name}
+              <span className="hidden sm:inline"> · {event.area}</span>
+            </span>
           </li>
         </ul>
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-          <span className="border-2 border-black bg-durbs-cyan px-2 py-0.5 text-xs font-black">
+        <div className="mt-auto flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between sm:pt-3">
+          <span className="max-w-full self-start truncate border-2 border-black bg-durbs-cyan px-2 py-0.5 text-[11px] font-black sm:self-auto sm:text-xs">
             {event.price_text || "TBC"}
           </span>
           <div className="flex items-center gap-2">
-            <AddToCalendar event={event} compact />
+            <div className="hidden sm:block">
+              <AddToCalendar event={event} compact />
+            </div>
             {event.ticket_url ? (
               <a
                 href={event.ticket_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="brutal-btn bg-durbs-pink !px-3 !py-1.5 !text-xs text-white"
+                className="brutal-btn w-full bg-durbs-pink !px-2 !py-1.5 !text-[11px] text-white sm:w-auto sm:!px-3 sm:!text-xs"
               >
                 <Ticket className="h-3.5 w-3.5" /> Tickets
               </a>
             ) : (
-              <Link href={href} className="brutal-btn bg-white !px-3 !py-1.5 !text-xs">
+              <Link
+                href={href}
+                className="brutal-btn w-full bg-white !px-2 !py-1.5 !text-[11px] sm:w-auto sm:!px-3 sm:!text-xs"
+              >
                 Details
               </Link>
             )}
