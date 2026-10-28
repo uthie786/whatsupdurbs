@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Heart, RotateCcw, SlidersHorizontal } from "lucide-react";
-import type { AreaFilter, CategoryFilter, DateFilter } from "@/types/event";
+import type { AreaFilter, DateFilter, EventCategory } from "@/types/event";
 import { EVENT_CATEGORIES } from "@/types/event";
 import { AREA_FILTERS, categoryLabel } from "@/lib/areas";
 import { isRangeActive, type DateRange } from "@/lib/filters";
@@ -10,14 +10,16 @@ import DateRangePicker from "./DateRangePicker";
 import NearMeButton from "./NearMeButton";
 import type { NearMeStatus } from "@/lib/useNearMe";
 
-export const CATEGORY_FILTERS: CategoryFilter[] = ["All", ...EVENT_CATEGORIES];
+const CATEGORY_OPTIONS = ["All", ...EVENT_CATEGORIES] as const;
 export const DATE_FILTERS: DateFilter[] = ["All", "Today", "This Weekend", "Festive Season"];
 
 interface FilterBarProps {
-  category: CategoryFilter;
+  /** Selected categories (several allowed); empty means all. */
+  categories: ReadonlySet<EventCategory>;
+  onToggleCategory: (c: EventCategory) => void;
+  onClearCategories: () => void;
   date: DateFilter;
   area: AreaFilter;
-  onCategoryChange: (v: CategoryFilter) => void;
   onDateChange: (v: DateFilter) => void;
   onAreaChange: (v: AreaFilter) => void;
   dateRange: DateRange;
@@ -36,13 +38,16 @@ function ChipRow<T extends string>({
   label,
   options,
   value,
+  isPressed = (o) => o === value,
   onChange,
   renderOption = (o) => o,
   className = "",
 }: {
   label: string;
   options: readonly T[];
-  value: T;
+  value?: T;
+  /** For multi-select rows; defaults to `o === value`. */
+  isPressed?: (o: T) => boolean;
   onChange: (v: T) => void;
   renderOption?: (o: T) => string;
   className?: string;
@@ -60,7 +65,7 @@ function ChipRow<T extends string>({
           <button
             key={o}
             type="button"
-            aria-pressed={value === o}
+            aria-pressed={isPressed(o)}
             onClick={() => onChange(o)}
             className="brutal-chip shrink-0 whitespace-nowrap"
           >
@@ -81,9 +86,9 @@ export default function FilterBar(props: FilterBarProps) {
     <div className="space-y-3 border-4 border-black bg-durbs-yellow p-3 shadow-brutal-lg sm:p-4">
       <ChipRow
         label="Category"
-        options={CATEGORY_FILTERS}
-        value={props.category}
-        onChange={props.onCategoryChange}
+        options={CATEGORY_OPTIONS}
+        isPressed={(c) => (c === "All" ? props.categories.size === 0 : props.categories.has(c))}
+        onChange={(c) => (c === "All" ? props.onClearCategories() : props.onToggleCategory(c))}
         renderOption={(c) => (c === "All" ? "All" : categoryLabel(c))}
       />
       <ChipRow label="When" options={DATE_FILTERS} value={props.date} onChange={props.onDateChange} />

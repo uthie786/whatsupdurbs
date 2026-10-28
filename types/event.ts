@@ -69,7 +69,6 @@ export type NewEventInput = Omit<
   "id" | "is_featured" | "is_approved" | "created_at" | "source" | "external_id" | "denied_at" | "edited_at"
 >;
 
-export type CategoryFilter = "All" | EventCategory;
 export type DateFilter = "All" | "Today" | "This Weekend" | "Festive Season";
 /** Filter options: "Beachfront" groups the central beachfront and the Point. */
 export type AreaFilter =

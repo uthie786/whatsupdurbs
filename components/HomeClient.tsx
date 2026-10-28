@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, Plus, Waves } from "lucide-react";
-import type { AreaFilter, CategoryFilter, DateFilter, DurbsEvent } from "@/types/event";
+import type { AreaFilter, DateFilter, DurbsEvent, EventCategory } from "@/types/event";
 import { fetchApprovedEvents, isSupabaseConfigured } from "@/lib/supabase";
 import { EMPTY_RANGE, filterEvents, type DateRange } from "@/lib/filters";
 import { distanceKm, eventPosition } from "@/lib/geo";
@@ -34,12 +34,20 @@ export default function HomeClient() {
 
   const [search, setSearch] = useState("");
   const [area, setArea] = useState<AreaFilter>("All Areas");
-  const [category, setCategory] = useState<CategoryFilter>("All");
+  const [categories, setCategories] = useState<ReadonlySet<EventCategory>>(new Set());
   const [date, setDate] = useState<DateFilter>("All");
   const [range, setRange] = useState<DateRange>(EMPTY_RANGE);
   const [savedOnly, setSavedOnly] = useState(false);
   const { saved, count: savedCount } = useSavedEvents();
   const nearMe = useNearMe();
+
+  const toggleCategory = (c: EventCategory) =>
+    setCategories((current) => {
+      const next = new Set(current);
+      if (!next.delete(c)) next.add(c);
+      return next;
+    });
+  const clearCategories = () => setCategories(new Set());
 
   // Quick "When" chips and the custom range are mutually exclusive.
   const changeDate = (value: DateFilter) => {
@@ -65,10 +73,16 @@ export default function HomeClient() {
     };
   }, []);
 
-  const matching = useMemo(() => {
-    const list = filterEvents(events, { search, area, category, date, range });
+  // Every filter except category: decides which category tags are offered.
+  const withoutCategory = useMemo(() => {
+    const list = filterEvents(events, { search, area, categories: new Set(), date, range });
     return savedOnly ? list.filter((e) => saved.has(e.id)) : list;
-  }, [events, search, area, category, date, range, savedOnly, saved]);
+  }, [events, search, area, date, range, savedOnly, saved]);
+
+  const matching = useMemo(
+    () => (categories.size ? withoutCategory.filter((e) => categories.has(e.category)) : withoutCategory),
+    [withoutCategory, categories],
+  );
 
   // With "near me" on, closest events come first and cards show the distance.
   const distances = useMemo(() => {
@@ -86,7 +100,7 @@ export default function HomeClient() {
   const resetFilters = () => {
     setSearch("");
     setArea("All Areas");
-    setCategory("All");
+    clearCategories();
     setDate("All");
     setRange(EMPTY_RANGE);
     setSavedOnly(false);
@@ -181,6 +195,10 @@ export default function HomeClient() {
 
         <MapSection
           events={filtered}
+          legendEvents={withoutCategory}
+          categories={categories}
+          onToggleCategory={toggleCategory}
+          onClearCategories={clearCategories}
           dateRange={range}
           onDateRangeChange={changeRange}
           nearMeStatus={nearMe.status}
@@ -199,10 +217,11 @@ export default function HomeClient() {
             </span>
           </div>
           <FilterBar
-            category={category}
+            categories={categories}
+            onToggleCategory={toggleCategory}
+            onClearCategories={clearCategories}
             date={date}
             area={area}
-            onCategoryChange={setCategory}
             onDateChange={changeDate}
             dateRange={range}
             onDateRangeChange={changeRange}
