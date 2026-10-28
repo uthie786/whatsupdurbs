@@ -9,6 +9,7 @@ import EventMap from "@/components/EventMap";
 import SaveButton from "@/components/SaveButton";
 import AddToCalendar from "@/components/AddToCalendar";
 import ShareButtons from "@/components/ShareButtons";
+import StoryShareButton from "@/components/StoryShareButton";
 import FeatureRequestButton from "@/components/FeatureRequestButton";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
@@ -165,7 +166,10 @@ export default async function EventPage({ params }: PageProps) {
 
             <div className="space-y-2 border-t-3 border-black pt-4">
               <p className="font-display text-sm uppercase">Tell your crew</p>
-              <ShareButtons event={event} />
+              <div className="flex flex-wrap gap-2">
+                <ShareButtons event={event} />
+                <StoryShareButton slug={event.slug} />
+              </div>
             </div>
 
             {!event.is_featured && !ended && (

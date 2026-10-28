@@ -89,6 +89,7 @@ notify pgrst, 'reload schema';
 - **Categories:** Markets, Concerts, Nightlife, Festive, Popups, Fitness, Outdoors, Cars, Food, Theatre, Arts, Family, Social, Workshops. They're defined in `types/event.ts` with colours, emoji and descriptions in `lib/areas.ts`; the descriptions also guide the poster AI. Adding one also needs the `events_category_check` constraint updated.
 
 - **Event pages** at `/events/<slug>`: poster, details, map with directions, Get Tickets, WhatsApp / native share / copy link, add to calendar and save. Link previews (WhatsApp, Facebook, X) show the poster, and schema.org `Event` data helps Google list events. Pages refresh from the database at most every 5 minutes.
+- **Story image**: on an event page, **Story image** makes a 1080×1920 Instagram-story PNG (logo, poster, title, when/where/price) in yellow, pink or cyan, served by `/events/<slug>/story?theme=…` (`lib/storyImage.tsx`, rendered with `next/og`). Phones can share it straight to Instagram; otherwise it downloads. Fonts are in `assets/fonts` (Archivo Black and Space Grotesk, SIL Open Font License). Posters must be PNG or JPEG to appear; otherwise the category block is shown.
 - **Add to calendar**: Google Calendar link or an `.ics` file for Apple Calendar / Outlook (all-day when the time is TBC).
 - **Saved events**: the ❤️ button stores events in the visitor's browser (no account); the **Saved** filter shows only those.
 - **Near me**: asks for the visitor's location (only when they tap it), sorts events by distance and shows them on the map.
