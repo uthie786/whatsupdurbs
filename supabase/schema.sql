@@ -45,7 +45,7 @@ alter table public.events drop constraint if exists events_area_check;
 alter table public.events add constraint events_area_check check (area in
   ('Umhlanga','Morningside','Durban North','Ballito',
    'Central Beachfront','Point Waterfront',
-   'CBD & Berea','Westville','Pinetown','Upper Highway'));
+   'CBD & Berea','Westville','Pinetown','Upper Highway','eMdloti'));
 
 -- Re-label Quicket events by venue location: nearest area centre, as the sync does.
 -- (Manual and poster events store their chosen area's centre, so they're already right.)
@@ -55,7 +55,8 @@ update public.events e set area = (
     ('Durban North', -29.7896, 31.0322), ('Ballito', -29.5389, 31.2144),
     ('Central Beachfront', -29.8579, 31.0384), ('Point Waterfront', -29.8686, 31.0464),
     ('CBD & Berea', -29.855, 31.016), ('Westville', -29.838, 30.929),
-    ('Pinetown', -29.818, 30.865), ('Upper Highway', -29.78, 30.79)
+    ('Pinetown', -29.818, 30.865), ('Upper Highway', -29.78, 30.79),
+    ('eMdloti', -29.665, 31.112)
   ) as c(area, lat, lng)
   order by power(c.lat - e.latitude, 2) + power((c.lng - e.longitude) * cos(radians(-29.85)), 2)
   limit 1)

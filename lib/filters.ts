@@ -9,9 +9,9 @@ import {
 } from "date-fns";
 import type {
   AreaFilter,
-  CategoryFilter,
   DateFilter,
   DurbsEvent,
+  EventCategory,
 } from "@/types/event";
 import { areaMatches } from "@/lib/areas";
 import { isTimeUnknown, sastDayKey, sastParts } from "@/lib/time";
@@ -90,7 +90,8 @@ export function rangeMatches(range: DateRange, event: DurbsEvent): boolean {
 
 export interface EventFilters {
   search: string;
-  category: CategoryFilter;
+  /** Empty means every category. */
+  categories: ReadonlySet<EventCategory>;
   date: DateFilter;
   area: AreaFilter;
   range?: DateRange;
@@ -99,7 +100,7 @@ export interface EventFilters {
 export function filterEvents(events: DurbsEvent[], f: EventFilters): DurbsEvent[] {
   const q = f.search.trim().toLowerCase();
   return events.filter((e) => {
-    if (f.category !== "All" && e.category !== f.category) return false;
+    if (f.categories.size > 0 && !f.categories.has(e.category)) return false;
     if (!areaMatches(f.area, e.area)) return false;
     if (!dateMatches(f.date, e)) return false;
     if (f.range && isRangeActive(f.range) && !rangeMatches(f.range, e)) return false;
