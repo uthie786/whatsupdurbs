@@ -60,6 +60,27 @@ alter table public.events add constraint events_category_check check (category i
   ('Markets','Concerts','Nightlife','Festive','Popups','Fitness','Outdoors','Cars',
    'Food','Theatre','Arts','Family','Social','Workshops'));
 
+-- Allowed areas (keep in sync with DURBAN_AREAS / AREA_COORDS in the app).
+alter table public.events drop constraint if exists events_area_check;
+alter table public.events add constraint events_area_check check (area in
+  ('Umhlanga','Morningside','Durban North','Ballito',
+   'Central Beachfront','Point Waterfront',
+   'CBD & Berea','Westville','Pinetown','Upper Highway'));
+
+-- Re-label Quicket events by venue location: nearest area centre, as the sync does.
+-- (Manual and poster events store their chosen area's centre, so they're already right.)
+update public.events e set area = (
+  select c.area from (values
+    ('Umhlanga', -29.7262, 31.0849), ('Morningside', -29.8261, 31.0164),
+    ('Durban North', -29.7896, 31.0322), ('Ballito', -29.5389, 31.2144),
+    ('Central Beachfront', -29.8579, 31.0384), ('Point Waterfront', -29.8686, 31.0464),
+    ('CBD & Berea', -29.855, 31.016), ('Westville', -29.838, 30.929),
+    ('Pinetown', -29.818, 30.865), ('Upper Highway', -29.78, 30.79)
+  ) as c(area, lat, lng)
+  order by power(c.lat - e.latitude, 2) + power((c.lng - e.longitude) * cos(radians(-29.85)), 2)
+  limit 1)
+where e.source = 'quicket';
+
 notify pgrst, 'reload schema';
 ```
 
@@ -68,6 +89,7 @@ notify pgrst, 'reload schema';
 - **Categories:** Markets, Concerts, Nightlife, Festive, Popups, Fitness, Outdoors, Cars, Food, Theatre, Arts, Family, Social, Workshops. They're defined in `types/event.ts` with colours, emoji and descriptions in `lib/areas.ts`; the descriptions also guide the poster AI. Adding one also needs the `events_category_check` constraint updated.
 
 - **Event pages** at `/events/<slug>`: poster, details, map with directions, Get Tickets, WhatsApp / native share / copy link, add to calendar and save. Link previews (WhatsApp, Facebook, X) show the poster, and schema.org `Event` data helps Google list events. Pages refresh from the database at most every 5 minutes.
+- **Story image**: on an event page, **Story image** makes a 1080×1920 Instagram-story PNG (logo, poster, title, when/where/price) in yellow, pink or cyan, served by `/events/<slug>/story?theme=…` (`lib/storyImage.tsx`, rendered with `next/og`). Phones can share it straight to Instagram; otherwise it downloads. Fonts are in `assets/fonts` (Archivo Black and Space Grotesk, SIL Open Font License). Posters must be PNG or JPEG to appear; otherwise the category block is shown.
 - **Add to calendar**: Google Calendar link or an `.ics` file for Apple Calendar / Outlook (all-day when the time is TBC).
 - **Saved events**: the ❤️ button stores events in the visitor's browser (no account); the **Saved** filter shows only those.
 - **Near me**: asks for the visitor's location (only when they tap it), sorts events by distance and shows them on the map.
@@ -86,7 +108,7 @@ Setup:
 - A daily Vercel Cron (`vercel.json`) calls the same endpoint as a backup.
 - `GET /api/sync/quicket?dryRun=1` (with `Authorization: Bearer $CRON_SECRET`) fetches and maps without saving.
 - Re-syncs update an event's details but never override your approve / feature / unpublish choices.
-- Events are matched to the nearest of the six areas for filtering; their map pins use the real venue location.
+- Events are matched to the nearest area centre (`AREA_COORDS` in `lib/areas.ts`) for filtering; their map pins use the real venue location.
 
 Past events are hidden from the public site automatically (nothing is deleted).
 

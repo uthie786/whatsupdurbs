@@ -24,6 +24,10 @@ export const DURBAN_AREAS = [
   "Ballito",
   "Central Beachfront",
   "Point Waterfront",
+  "CBD & Berea",
+  "Westville",
+  "Pinetown",
+  "Upper Highway",
 ] as const;
 
 export type DurbanArea = (typeof DURBAN_AREAS)[number];
@@ -67,10 +71,8 @@ export type NewEventInput = Omit<
 
 export type CategoryFilter = "All" | EventCategory;
 export type DateFilter = "All" | "Today" | "This Weekend" | "Festive Season";
+/** Filter options: "Beachfront" groups the central beachfront and the Point. */
 export type AreaFilter =
   | "All Areas"
-  | "Umhlanga"
-  | "Morningside"
-  | "Durban North"
-  | "Ballito"
-  | "Beachfront";
+  | "Beachfront"
+  | Exclude<DurbanArea, "Central Beachfront" | "Point Waterfront">;

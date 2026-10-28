@@ -9,15 +9,24 @@ export const AREA_COORDS: Record<DurbanArea, [number, number]> = {
   Ballito: [-29.5389, 31.2144],
   "Central Beachfront": [-29.8579, 31.0384],
   "Point Waterfront": [-29.8686, 31.0464],
+  "CBD & Berea": [-29.855, 31.016],
+  Westville: [-29.838, 30.929],
+  Pinetown: [-29.818, 30.865],
+  // Hillcrest, Kloof, Gillitts, Botha's Hill
+  "Upper Highway": [-29.78, 30.79],
 };
 
 export const AREA_FILTERS: AreaFilter[] = [
   "All Areas",
-  "Umhlanga",
-  "Morningside",
-  "Durban North",
   "Ballito",
+  "Umhlanga",
+  "Durban North",
+  "Morningside",
+  "CBD & Berea",
   "Beachfront",
+  "Westville",
+  "Pinetown",
+  "Upper Highway",
 ];
 
 /** "Beachfront" groups both the central beachfront and the Point waterfront. */

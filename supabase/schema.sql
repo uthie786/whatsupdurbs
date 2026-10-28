@@ -10,7 +10,7 @@ create table if not exists public.events (
   category     text not null,
   venue_name   text not null,
   address      text not null default '',
-  area         text not null check (area in ('Umhlanga','Morningside','Durban North','Ballito','Central Beachfront','Point Waterfront')),
+  area         text not null,
   latitude     double precision not null,
   longitude    double precision not null,
   start_date   timestamptz not null,
@@ -39,6 +39,27 @@ alter table public.events drop constraint if exists events_category_check;
 alter table public.events add constraint events_category_check check (category in
   ('Markets','Concerts','Nightlife','Festive','Popups','Fitness','Outdoors','Cars',
    'Food','Theatre','Arts','Family','Social','Workshops'));
+
+-- Allowed areas (keep in sync with DURBAN_AREAS / AREA_COORDS in the app).
+alter table public.events drop constraint if exists events_area_check;
+alter table public.events add constraint events_area_check check (area in
+  ('Umhlanga','Morningside','Durban North','Ballito',
+   'Central Beachfront','Point Waterfront',
+   'CBD & Berea','Westville','Pinetown','Upper Highway'));
+
+-- Re-label Quicket events by venue location: nearest area centre, as the sync does.
+-- (Manual and poster events store their chosen area's centre, so they're already right.)
+update public.events e set area = (
+  select c.area from (values
+    ('Umhlanga', -29.7262, 31.0849), ('Morningside', -29.8261, 31.0164),
+    ('Durban North', -29.7896, 31.0322), ('Ballito', -29.5389, 31.2144),
+    ('Central Beachfront', -29.8579, 31.0384), ('Point Waterfront', -29.8686, 31.0464),
+    ('CBD & Berea', -29.855, 31.016), ('Westville', -29.838, 30.929),
+    ('Pinetown', -29.818, 30.865), ('Upper Highway', -29.78, 30.79)
+  ) as c(area, lat, lng)
+  order by power(c.lat - e.latitude, 2) + power((c.lng - e.longitude) * cos(radians(-29.85)), 2)
+  limit 1)
+where e.source = 'quicket';
 
 create index if not exists events_approved_start_idx on public.events (is_approved, start_date);
 
