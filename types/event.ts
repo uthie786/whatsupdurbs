@@ -28,6 +28,7 @@ export const DURBAN_AREAS = [
   "Westville",
   "Pinetown",
   "Upper Highway",
+  "eMdloti",
 ] as const;
 
 export type DurbanArea = (typeof DURBAN_AREAS)[number];

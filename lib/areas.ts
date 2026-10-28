@@ -14,11 +14,14 @@ export const AREA_COORDS: Record<DurbanArea, [number, number]> = {
   Pinetown: [-29.818, 30.865],
   // Hillcrest, Kloof, Gillitts, Botha's Hill
   "Upper Highway": [-29.78, 30.79],
+  // eMdloti / Umdloti village and La Mercy
+  eMdloti: [-29.665, 31.112],
 };
 
 export const AREA_FILTERS: AreaFilter[] = [
   "All Areas",
   "Ballito",
+  "eMdloti",
   "Umhlanga",
   "Durban North",
   "Morningside",
