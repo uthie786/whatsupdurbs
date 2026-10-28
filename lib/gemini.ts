@@ -88,7 +88,7 @@ Rules:
 - description: 1-2 short sentences in your own words about what the event is (performers, theme). No marketing hype.
 - category: exactly one of these (pick the most specific; Popups only if nothing else fits):
 ${CATEGORY_GUIDE}
-- area: the closest of ${DURBAN_AREAS.join(", ")} based on the venue, or null if you can't tell. Durban CBD, ICC, Playhouse and Suncoast count as Central Beachfront; uShaka and the Point precinct as Point Waterfront; Sibaya and Gateway as Umhlanga; Florida Road and Berea as Morningside.
+- area: the closest of ${DURBAN_AREAS.join(", ")} based on the venue, or null if you can't tell. Durban CBD, City Hall, Berea, Glenwood and Musgrave count as CBD & Berea; the ICC, Playhouse, Suncoast and the beachfront promenade as Central Beachfront; uShaka and the Point precinct as Point Waterfront; Sibaya and Gateway as Umhlanga; Florida Road as Morningside; the Pavilion as Westville; Hillcrest, Kloof, Gillitts and Botha's Hill as Upper Highway.
 - start_local / end_local: local time as YYYY-MM-DDTHH:mm. If the year isn't printed, use the next occurrence on or after today. If no time is printed, use T00:00 for start and null for end. Use the "doors open" time if no start time is given.
 - price_text: short, e.g. "Free", "R150", "From R200", "R250 – R350".
 - ticket_url: only a URL or ticketing site printed on the poster (e.g. "Quicket" alone is not a URL), otherwise null.
