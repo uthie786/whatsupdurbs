@@ -8,6 +8,7 @@ import type { DateRange } from "@/lib/filters";
 import DateRangePicker from "./DateRangePicker";
 import EventMap from "./EventMap";
 import NearMeButton from "./NearMeButton";
+import ScrollRow from "./ScrollRow";
 import type { LatLng } from "@/lib/geo";
 import type { NearMeStatus } from "@/lib/useNearMe";
 
@@ -51,9 +52,10 @@ export default function MapSection({
         </h2>
       </div>
       {/* Category tags: tap to show only those categories (several at once); one row that scrolls on phones. */}
-      <div
-        className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-2 pt-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
-        role="group"
+      <ScrollRow
+        className="-mx-4 mb-4 sm:mx-0"
+        rowClassName="flex gap-2 overflow-x-auto px-4 pb-2 pt-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:px-0"
+        fade="white"
         aria-label="Show categories on the map"
       >
         {/* First, so it stays in view while the row scrolls on phones. */}
@@ -88,7 +90,7 @@ export default function MapSection({
             </button>
           );
         })}
-      </div>
+      </ScrollRow>
       {dateRange && onDateRangeChange && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-3 border-black bg-durbs-yellow px-3 py-2 shadow-brutal">
           <DateRangePicker value={dateRange} onChange={onDateRangeChange} />

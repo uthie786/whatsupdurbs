@@ -8,6 +8,7 @@ import { AREA_FILTERS, categoryLabel } from "@/lib/areas";
 import { isRangeActive, type DateRange } from "@/lib/filters";
 import DateRangePicker from "./DateRangePicker";
 import NearMeButton from "./NearMeButton";
+import ScrollRow from "./ScrollRow";
 import type { NearMeStatus } from "@/lib/useNearMe";
 
 const CATEGORY_OPTIONS = ["All", ...EVENT_CATEGORIES] as const;
@@ -56,9 +57,10 @@ function ChipRow<T extends string>({
     <div className={`flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2 ${className}`}>
       <span className={LABEL}>{label}</span>
       {/* One sideways-scrolling row on phones; wraps from sm up. */}
-      <div
-        className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1.5 pt-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:p-0"
-        role="group"
+      <ScrollRow
+        className="-mx-3 sm:mx-0"
+        rowClassName="flex gap-2 overflow-x-auto px-3 pb-1.5 pt-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:p-0"
+        fade="yellow"
         aria-label={`${label} filter`}
       >
         {options.map((o) => (
@@ -72,7 +74,7 @@ function ChipRow<T extends string>({
             {renderOption(o)}
           </button>
         ))}
-      </div>
+      </ScrollRow>
     </div>
   );
 }
