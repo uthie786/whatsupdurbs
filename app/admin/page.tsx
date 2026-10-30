@@ -6,6 +6,12 @@ import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
 import BulkPosterImport from "@/components/BulkPosterImport";
 import EditEventPanel from "@/components/EditEventPanel";
+import AdminFilters, {
+  EMPTY_ADMIN_FILTERS,
+  isAdminFilterActive,
+  matchesAdminFilters,
+  type AdminFilterState,
+} from "@/components/AdminFilters";
 import { findLikelyDuplicates } from "@/lib/duplicates";
 import type { DurbsEvent } from "@/types/event";
 import { CATEGORY_BG } from "@/lib/areas";
@@ -106,6 +112,7 @@ export default function AdminPage() {
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<AdminFilterState>(EMPTY_ADMIN_FILTERS);
 
   useEffect(() => {
     if (!supabase) return;
@@ -188,7 +195,12 @@ export default function AdminPage() {
   const pending = events.filter((e) => !e.is_approved && !e.denied_at);
   const approved = events.filter((e) => e.is_approved);
   const denied = events.filter((e) => !e.is_approved && e.denied_at);
-  const visible = tab === "pending" ? pending : tab === "approved" ? approved : denied;
+  const tabEvents = tab === "pending" ? pending : tab === "approved" ? approved : denied;
+  const filtering = isAdminFilterActive(filters);
+  const visible = filtering ? tabEvents.filter((e) => matchesAdminFilters(e, filters)) : tabEvents;
+  /** "Live (12)" or, while filtering, "Live (3 of 12)". */
+  const tabCount = (list: DurbsEvent[]) =>
+    filtering ? `${list.filter((e) => matchesAdminFilters(e, filters)).length} of ${list.length}` : String(list.length);
 
   // Likely duplicates among live and pending events (denied ones are on their way out).
   const duplicatesById = useMemo(() => {
@@ -266,9 +278,9 @@ export default function AdminPage() {
             <div className="flex flex-wrap gap-3" role="tablist">
               {(
                 [
-                  ["pending", `Pending (${pending.length})`, "bg-durbs-pink text-white"],
-                  ["approved", `Live (${approved.length})`, "bg-durbs-cyan"],
-                  ["denied", `Denied (${denied.length})`, "bg-black text-white"],
+                  ["pending", `Pending (${tabCount(pending)})`, "bg-durbs-pink text-white"],
+                  ["approved", `Live (${tabCount(approved)})`, "bg-durbs-cyan"],
+                  ["denied", `Denied (${tabCount(denied)})`, "bg-black text-white"],
                 ] as const
               ).map(([key, label, active]) => (
                 <button
@@ -284,12 +296,21 @@ export default function AdminPage() {
               ))}
             </div>
 
+            <AdminFilters value={filters} onChange={setFilters} tabEvents={tabEvents} />
+
             {error && (
               <p className="border-3 border-black bg-red-500 px-4 py-2 font-bold text-white">{error}</p>
             )}
 
             {loading ? (
               <p className="font-bold">Loading…</p>
+            ) : visible.length === 0 && filtering ? (
+              <div className="flex flex-col items-center gap-3 border-4 border-dashed border-black p-8 text-center">
+                <p className="font-display text-xl uppercase">No events match these filters.</p>
+                <button type="button" onClick={() => setFilters(EMPTY_ADMIN_FILTERS)} className="brutal-btn bg-durbs-cyan">
+                  Clear filters
+                </button>
+              </div>
             ) : visible.length === 0 ? (
               <p className="border-4 border-dashed border-black p-8 text-center font-display text-xl uppercase">
                 {tab === "pending"
