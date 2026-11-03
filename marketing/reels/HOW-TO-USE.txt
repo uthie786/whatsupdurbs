@@ -1,0 +1,36 @@
+WhatsUpDurbs reel pack — how to use (CapCut)
+=============================================
+
+All clips are 1080x1920 (9:16), 30 fps, no sound. Add music in Instagram.
+
+FILES
+  intro.mp4                         3.0s  Opens the reel. Ends on full-screen colour bars,
+                                          so hard-cut straight to your first event.
+  outro.mp4                         3.6s  Closes the reel. Starts on colour bars that slide
+                                          away. Freeze or extend the last frame if you want.
+  transition-*-greenscreen.mp4      0.8s  Transitions on a green background (for phones).
+  transition-*-alpha.mov            0.8s  Same transitions with real transparency (desktop).
+      blocks   – yellow/pink/cyan bars slide across
+      stripes  – diagonal colour stripes sweep through
+      slam     – yellow panel drops with a "NEXT UP →" sticker
+      box      – bordered squares zoom up and away
+  overlay-this-week-*               2.0s  "THIS WEEK 🔥" badge that wobbles; loops cleanly.
+  demo-reel.mp4                           An example of everything put together.
+
+BUILD A REEL
+  1. Add intro.mp4 to the main track.
+  2. Add each event after it: a clip of the venue, or the event poster / Story image from
+     the site (3–4s each works well).
+  3. For each change between events, add a transition as an OVERLAY (Overlay → Add overlay),
+     stretched to full screen, and line its MIDDLE (0.4s in) up with the cut between the two
+     events. The screen is fully covered from about 0.27s to 0.5s, so the cut is hidden.
+  4. Add outro.mp4 at the end. A transition right before it looks great too.
+  5. Optional: put overlay-this-week on top of the event clips and move/resize it.
+
+REMOVING THE GREEN (CapCut on a phone)
+  Select the overlay → Remove BG → Chroma key → pick the green → Intensity ~20–30.
+  The transitions use no green, so nothing else gets removed.
+  On CapCut desktop you can use the *-alpha.mov files instead; no keying needed.
+
+TIP: Keep the reel to 15–30s. Text the viewer must read should stay in the middle of the
+screen: Instagram covers the top ~250px and bottom ~340px.
