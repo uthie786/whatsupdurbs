@@ -85,6 +85,10 @@ where e.source = 'quicket';
 notify pgrst, 'reload schema';
 ```
 
+## Event stats
+
+`/admin/stats` shows how many times each event page was opened and its ticket link tapped (last 7 days, 30 days or all time). These are **anonymous daily totals** only: no cookies, IP addresses or visitor IDs are stored, and signed-in admins aren't counted. Each browser tab counts an event once per session. Needs the `event_stats` table and `track_event` function from `supabase/schema.sql`.
+
 ## Visitor features
 
 - **Categories:** Markets, Concerts, Nightlife, Festive, Popups, Fitness, Outdoors, Cars, Food, Theatre, Arts, Family, Social, Workshops. They're defined in `types/event.ts` with colours, emoji and descriptions in `lib/areas.ts`; the descriptions also guide the poster AI. Adding one also needs the `events_category_check` constraint updated.

@@ -10,6 +10,7 @@ import { eventPath } from "@/lib/site";
 import EventImage from "./EventImage";
 import SaveButton from "./SaveButton";
 import AddToCalendar from "./AddToCalendar";
+import TicketLink from "./TicketLink";
 
 interface EventCardProps {
   event: DurbsEvent;
@@ -78,14 +79,13 @@ export default function EventCard({ event, distanceKm = null }: EventCardProps) 
               <AddToCalendar event={event} compact />
             </div>
             {event.ticket_url ? (
-              <a
+              <TicketLink
+                eventId={event.id}
                 href={event.ticket_url}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="brutal-btn w-full bg-durbs-pink !px-2 !py-1.5 !text-[11px] text-white sm:w-auto sm:!px-3 sm:!text-xs"
               >
                 <Ticket className="h-3.5 w-3.5" /> Tickets
-              </a>
+              </TicketLink>
             ) : (
               <Link
                 href={href}

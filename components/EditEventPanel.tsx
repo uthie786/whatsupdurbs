@@ -48,12 +48,8 @@ export default function EditEventPanel({ event, onSaved, onCancel }: EditEventPa
     // Keep the slug so shared links still work.
     const { slug: _slug, ...input } = built.input;
     void _slug;
+    // Latitude/longitude come from the form's map pin.
     const patch: EventDetailsPatch = { ...input };
-    // Keep the exact venue position unless the area changed (form positions use area centres).
-    if (form.area === event.area) {
-      patch.latitude = event.latitude;
-      patch.longitude = event.longitude;
-    }
     setSaving(true);
     try {
       if (newPoster) patch.image_url = await uploadPoster(newPoster);

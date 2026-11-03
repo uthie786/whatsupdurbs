@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="28 October 2026">
+    <LegalPage title="Privacy Policy" updated="3 November 2026">
       <p>
         WhatsUpDurbs (&quot;we&quot;, &quot;us&quot;) is a free guide to events in Durban, South Africa, at{" "}
         <Link href="/">whatsupdurbs.vercel.app</Link>. This policy explains what information we handle, why, and your
@@ -26,6 +26,11 @@ export default function PrivacyPage() {
         <li>
           <strong>&quot;Near me&quot;</strong> asks your browser for your location only when you tap it. The distance is
           worked out on your device; your location is not sent to or stored by us.
+        </li>
+        <li>
+          <strong>Event stats:</strong> we count, anonymously, how many times each event page is opened and its ticket
+          link is tapped. These are daily totals per event, with no cookies, IP address or anything else that identifies
+          you, and help us see which events people are interested in.
         </li>
         <li>
           Our hosting provider (Vercel) keeps standard server logs, such as IP address and browser type, for security

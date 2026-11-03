@@ -13,6 +13,7 @@ import { distanceKm, eventPosition, type LatLng } from "@/lib/geo";
 import { eventPath } from "@/lib/site";
 import { formatEventDate } from "@/lib/filters";
 import EventImage from "./EventImage";
+import TicketLink from "./TicketLink";
 
 interface InteractiveMapProps {
   events: DurbsEvent[];
@@ -144,14 +145,13 @@ export default function InteractiveMap({ events, userLocation = null }: Interact
                     <p className="!m-0 text-xs font-black">💸 {event.price_text}</p>
                   )}
                   {event.ticket_url ? (
-                    <a
+                    <TicketLink
+                      eventId={event.id}
                       href={event.ticket_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="brutal-btn mt-1 w-full bg-durbs-pink !py-1.5 !text-xs !text-white"
                     >
                       <Ticket className="h-3.5 w-3.5" /> Get Tickets
-                    </a>
+                    </TicketLink>
                   ) : (
                     <span className="brutal-badge mt-1 bg-durbs-cyan">No ticket needed</span>
                   )}

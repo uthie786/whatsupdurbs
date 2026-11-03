@@ -98,3 +98,18 @@ export const CATEGORY_INFO: Record<EventCategory, { emoji: string; covers: strin
 export function categoryLabel(category: EventCategory): string {
   return `${CATEGORY_INFO[category].emoji} ${category}`;
 }
+
+/** The area whose centre is closest to a point (used to label events by venue location). */
+export function nearestArea(lat: number, lng: number): DurbanArea {
+  let best: DurbanArea = "Central Beachfront";
+  let bestDist = Infinity;
+  for (const [area, [alat, alng]] of Object.entries(AREA_COORDS) as [DurbanArea, [number, number]][]) {
+    // Equirectangular distance is plenty at city scale.
+    const d = (alat - lat) ** 2 + ((alng - lng) * Math.cos((lat * Math.PI) / 180)) ** 2;
+    if (d < bestDist) {
+      best = area;
+      bestDist = d;
+    }
+  }
+  return best;
+}
