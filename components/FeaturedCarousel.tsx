@@ -9,6 +9,7 @@ import { formatEventDate } from "@/lib/filters";
 import EventImage from "./EventImage";
 import SaveButton from "./SaveButton";
 import { eventPath } from "@/lib/site";
+import TicketLink from "./TicketLink";
 
 const AUTO_ADVANCE_MS = 6000;
 
@@ -105,14 +106,9 @@ export default function FeaturedCarousel({ events }: { events: DurbsEvent[] }) {
           </ul>
           <div className="mt-auto flex flex-wrap items-center gap-3">
             {event.ticket_url && (
-              <a
-                href={event.ticket_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="brutal-btn bg-durbs-pink text-white"
-              >
+              <TicketLink eventId={event.id} href={event.ticket_url} className="brutal-btn bg-durbs-pink text-white">
                 <Ticket className="h-4 w-4" /> Get Tickets
-              </a>
+              </TicketLink>
             )}
             <Link href={eventPath(event)} className="brutal-btn bg-white">
               Details <ArrowRight className="h-4 w-4" />

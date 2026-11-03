@@ -10,6 +10,8 @@ import SaveButton from "@/components/SaveButton";
 import AddToCalendar from "@/components/AddToCalendar";
 import ShareButtons from "@/components/ShareButtons";
 import StoryShareButton from "@/components/StoryShareButton";
+import TicketLink from "@/components/TicketLink";
+import TrackView from "@/components/TrackView";
 import FeatureRequestButton from "@/components/FeatureRequestButton";
 import { CATEGORY_BG } from "@/lib/areas";
 import { formatEventDate } from "@/lib/filters";
@@ -103,6 +105,7 @@ export default async function EventPage({ params }: PageProps) {
     <>
       <Navbar compact />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+      <TrackView eventId={event.id} />
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
         <Link href="/#events" className="inline-flex items-center gap-1 text-sm font-black uppercase underline decoration-2 underline-offset-4">
           <ArrowLeft className="h-4 w-4" /> All events
@@ -147,14 +150,9 @@ export default async function EventPage({ params }: PageProps) {
 
             <div className="flex flex-wrap items-center gap-2">
               {event.ticket_url && (
-                <a
-                  href={event.ticket_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="brutal-btn bg-durbs-pink text-base text-white"
-                >
+                <TicketLink eventId={event.id} href={event.ticket_url} className="brutal-btn bg-durbs-pink text-base text-white">
                   <Ticket className="h-4 w-4" /> Get Tickets
-                </a>
+                </TicketLink>
               )}
               <AddToCalendar event={event} />
               <SaveButton eventId={event.id} title={event.title} withLabel />

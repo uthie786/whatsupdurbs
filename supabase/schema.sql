@@ -168,5 +168,40 @@ create table if not exists public.api_usage (
 create index if not exists api_usage_lookup on public.api_usage (kind, ip, created_at);
 alter table public.api_usage enable row level security;
 
+-- Anonymous event stats: daily view and ticket-click totals per event (no personal data).
+create table if not exists public.event_stats (
+  event_id uuid not null references public.events(id) on delete cascade,
+  day      date not null,
+  kind     text not null check (kind in ('view','ticket')),
+  count    integer not null default 0,
+  primary key (event_id, day, kind)
+);
+alter table public.event_stats enable row level security;
+
+drop policy if exists "Admins read stats" on public.event_stats;
+create policy "Admins read stats"
+  on public.event_stats for select
+  to authenticated
+  using (true);
+
+-- The only way the public site can write: add 1 to today's total for a live event.
+create or replace function public.track_event(p_event uuid, p_kind text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_kind not in ('view','ticket') then return; end if;
+  if not exists (select 1 from public.events where id = p_event and is_approved) then return; end if;
+  insert into public.event_stats (event_id, day, kind, count)
+  values (p_event, (now() at time zone 'Africa/Johannesburg')::date, p_kind, 1)
+  on conflict (event_id, day, kind) do update set count = public.event_stats.count + 1;
+end;
+$$;
+revoke all on function public.track_event(uuid, text) from public;
+grant execute on function public.track_event(uuid, text) to anon, authenticated;
+
+
 -- Make PostgREST pick up new columns immediately.
 notify pgrst, 'reload schema';

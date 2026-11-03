@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, Ban, Check, Clapperboard, CloudDownload, Loader2, LogOut, Pencil, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
+import { AlertTriangle, Ban, BarChart3, Check, Clapperboard, CloudDownload, Loader2, LogOut, Pencil, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import EventImage from "@/components/EventImage";
@@ -220,6 +220,9 @@ export default function AdminPage() {
           </div>
           {authed && (
             <div className="flex flex-wrap gap-2">
+              <Link href="/admin/stats" className="brutal-btn bg-durbs-cyan">
+                <BarChart3 className="h-4 w-4" /> Stats
+              </Link>
               <Link href="/admin/reel" className="brutal-btn bg-durbs-yellow">
                 <Clapperboard className="h-4 w-4" /> Reel maker
               </Link>
