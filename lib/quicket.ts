@@ -1,7 +1,7 @@
 // Quicket public events API → WhatsUpDurbs events.
 // Docs: https://docs.quicket.com (GET /api/events?api_key=…&pageSize=…&page=…&lastModified=…)
 import type { DurbanArea, DurbsEvent, EventCategory } from "@/types/event";
-import { AREA_COORDS, DURBAN_CENTER } from "@/lib/areas";
+import { DURBAN_CENTER, nearestArea } from "@/lib/areas";
 import { slugify } from "@/lib/filters";
 import { distanceKm } from "@/lib/geo";
 
@@ -114,18 +114,7 @@ export function isInDurbanRegion(lat: number, lng: number): boolean {
   return distanceKm(DURBAN_CENTER, [lat, lng]) <= DURBAN_RADIUS_KM;
 }
 
-export function nearestArea(lat: number, lng: number): DurbanArea {
-  let best: DurbanArea = "Central Beachfront";
-  let bestDist = Infinity;
-  for (const [area, coords] of Object.entries(AREA_COORDS) as [DurbanArea, [number, number]][]) {
-    const d = distanceKm(coords, [lat, lng]);
-    if (d < bestDist) {
-      best = area;
-      bestDist = d;
-    }
-  }
-  return best;
-}
+export { nearestArea } from "@/lib/areas";
 
 function isFestiveDate(value: string): boolean {
   const d = parseQuicketDate(value);

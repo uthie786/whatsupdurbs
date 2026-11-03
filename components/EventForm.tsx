@@ -11,6 +11,7 @@ import {
 import { AREA_COORDS, CATEGORY_INFO, categoryLabel } from "@/lib/areas";
 import { slugify } from "@/lib/filters";
 import { fromSastLocalInput, toSastLocalInput } from "@/lib/time";
+import LocationField, { hasExactPin } from "./LocationField";
 import type { DurbsEvent } from "@/types/event";
 
 export interface EventFormState {
@@ -22,6 +23,9 @@ export interface EventFormState {
   venue_name: string;
   address: string;
   area: DurbanArea;
+  /** Map pin as text ("" = not placed; the area centre is used). */
+  latitude: string;
+  longitude: string;
   price_text: string;
   image_url: string;
   ticket_url: string;
@@ -38,6 +42,8 @@ export const EMPTY_EVENT_FORM: EventFormState = {
   venue_name: "",
   address: "",
   area: "Umhlanga",
+  latitude: "",
+  longitude: "",
   price_text: "",
   image_url: "",
   ticket_url: "",
@@ -54,6 +60,8 @@ export function eventToForm(event: DurbsEvent): EventFormState {
     venue_name: event.venue_name,
     address: event.address ?? "",
     area: event.area,
+    latitude: String(event.latitude),
+    longitude: String(event.longitude),
     price_text: event.price_text ?? "",
     image_url: event.image_url ?? "",
     ticket_url: event.ticket_url ?? "",
@@ -74,7 +82,10 @@ export function buildEventInput(
   if (form.end_date && !end) return { error: "Please add a valid end date." };
   if (end && end < start) return { error: "End date can't be before the start date." };
 
-  const [latitude, longitude] = AREA_COORDS[form.area];
+  // The pin from the address lookup / map, or the area's centre if there isn't one.
+  const [latitude, longitude] = hasExactPin(form)
+    ? [Number(form.latitude), Number(form.longitude)]
+    : AREA_COORDS[form.area];
   return {
     input: {
       title: form.title.trim(),
@@ -170,7 +181,7 @@ export default function EventFormFields({
             ))}
           </select>
         </Field>
-        <Field label="Area" required flagged={f("area")}>
+        <Field label="Area" required flagged={f("area")} hint="Set from the map pin; change it if you like.">
           <select value={form.area} onChange={set("area")} className="brutal-input">
             {DURBAN_AREAS.map((a) => (
               <option key={a}>{a}</option>
@@ -225,6 +236,8 @@ export default function EventFormFields({
           />
         </Field>
       </div>
+
+      <LocationField form={form} onChange={onChange} />
 
       {!hideImageUrl && (
         <Field label="Image URL" hint="A landscape photo or poster works best.">
