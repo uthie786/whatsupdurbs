@@ -15,6 +15,8 @@ export type ReelColor = keyof typeof REEL_COLORS;
 
 export const DISPLAY = '"Reel Display", "Archivo Black", Impact, sans-serif';
 export const BODY = '"Reel Body", "Space Grotesk", system-ui, sans-serif';
+/** Tall condensed display face for the Sunset style. */
+export const CONDENSED = '"Reel Condensed", Anton, Impact, sans-serif';
 
 /* ---------- timing ---------- */
 export const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -42,6 +44,7 @@ export function loadReelAssets(): Promise<ReelAssets> {
     const fonts = [
       new FontFace("Reel Display", "url(/fonts/ArchivoBlack-Regular.ttf)"),
       new FontFace("Reel Body", "url(/fonts/SpaceGrotesk-Bold.ttf)", { weight: "700" }),
+      new FontFace("Reel Condensed", "url(/fonts/Anton-Regular.ttf)"),
     ];
     await Promise.all(fonts.map(async (f) => document.fonts.add(await f.load())));
     const logo = new Image();
@@ -246,4 +249,48 @@ export function barOffsets(t: number, inStart: number, inDur: number, outStart: 
     const pout = easeInCubic(prog(t, outStart + stagger, outDur));
     return t < outStart + stagger ? lerp(W + 120, 0, pin) : lerp(0, -W - 120, pout);
   });
+}
+
+/** Letter-spaced text centred on the origin (canvas letterSpacing isn't everywhere yet). */
+export function trackedText(ctx: CanvasRenderingContext2D, str: string, size: number, color: string, spacing: number, family = BODY) {
+  setFont(ctx, size, family);
+  const chars = Array.from(str);
+  const widths = chars.map((c) => ctx.measureText(c).width);
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = color;
+  let x = -total / 2;
+  chars.forEach((c, i) => {
+    ctx.fillText(c, x, size * 0.04);
+    x += widths[i] + spacing;
+  });
+  return total;
+}
+
+/** Greedy word wrap at `maxW`. */
+export function wrapWords(ctx: CanvasRenderingContext2D, str: string, size: number, maxW: number, family = DISPLAY): string[] {
+  const words = str.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && textWidth(ctx, next, size, family) > maxW) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/** Readable text colour (black or white) on a fill. */
+export function onColor(fill: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(fill.trim());
+  if (!m) return "#000";
+  const n = parseInt(m[1], 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#000" : "#fff";
 }
