@@ -12,7 +12,8 @@ export interface RenderedVideo {
  * H.264 MP4 where available; otherwise records the canvas in real time with MediaRecorder.
  */
 export async function renderToVideo(
-  draw: (ctx: CanvasRenderingContext2D, t: number) => void,
+  /** May be async, e.g. to wait for a background video to reach time t. */
+  draw: (ctx: CanvasRenderingContext2D, t: number) => void | Promise<void>,
   duration: number,
   onProgress: (fraction: number) => void,
 ): Promise<RenderedVideo> {
@@ -33,7 +34,7 @@ export async function renderToVideo(
     output.addVideoTrack(source, { frameRate: FPS });
     await output.start();
     for (let i = 0; i < frames; i++) {
-      draw(ctx, i / FPS);
+      await draw(ctx, i / FPS);
       await source.add(i / FPS, 1 / FPS);
       onProgress((i + 1) / frames);
     }
@@ -49,7 +50,7 @@ export async function renderToVideo(
 function recordRealtime(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
-  draw: (ctx: CanvasRenderingContext2D, t: number) => void,
+  draw: (ctx: CanvasRenderingContext2D, t: number) => void | Promise<void>,
   duration: number,
   onProgress: (fraction: number) => void,
 ): Promise<RenderedVideo> {
@@ -70,12 +71,12 @@ function recordRealtime(
       resolve({ blob: new Blob(chunks, { type: mime }), ext: mime.includes("mp4") ? "mp4" : "webm" });
     };
     recorder.onerror = () => reject(new Error("Recording failed."));
-    draw(ctx, 0);
+    void draw(ctx, 0);
     recorder.start();
     const started = performance.now();
     const tick = () => {
       const t = (performance.now() - started) / 1000;
-      draw(ctx, Math.min(t, duration));
+      void draw(ctx, Math.min(t, duration));
       onProgress(Math.min(1, t / duration));
       if (t < duration + 0.1) requestAnimationFrame(tick);
       else recorder.stop();

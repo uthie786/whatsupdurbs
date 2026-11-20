@@ -4,10 +4,13 @@ WhatsUpDurbs reel pack — how to use (CapCut)
 All clips are 1080x1920 (9:16), 30 fps, no sound. Add music in Instagram.
 
 CUSTOM INTRO / OUTRO
-  Want different wording or colours (e.g. "FESTIVE JOLS IN DECEMBER")? Open
-  whatsupdurbs.vercel.app/admin/reel (sign in as admin), edit the text, chips and colour,
-  watch the preview and tap "Make video". It downloads an MP4 that works exactly like the
-  intro/outro below, so the transitions still line up.
+  Open whatsupdurbs.vercel.app/admin/reel (sign in as admin). Pick a style:
+    - Neo-brutalist: the site's look (the intro/outro below).
+    - Sunset (game trailer): sunset sky, palms, letterbox bars, glowing gradient title.
+  Change any text (size, colour, position, show/hide), any colour (presets or a picker),
+  add your own picture or video as the background or as a framed card, and add a hold at
+  the end. Tap "Make video" for an MP4. Intros still end fully covered and outros still
+  start covered, so cuts and transitions line up.
 
 FILES
   intro.mp4                         3.0s  Opens the reel. Ends on full-screen colour bars,
